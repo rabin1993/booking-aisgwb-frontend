@@ -1,0 +1,227 @@
+"use client";
+
+import React, { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { Card, Button, Spinner, Alert, Row, Col } from "react-bootstrap";
+import { useAppDispatch } from "@/redux/hooks";
+import { fetchAttendeeById, updateAttendee } from "@/redux/slices/admin/attendeeSlice";
+import { AttendeeRecord } from "@/app/admin/dataStore";
+import Swal from "sweetalert2";
+import { Icon } from "@iconify/react";
+import { useSettingsContext } from "@/context/useSettingsContext";
+
+const ScannerContent = () => {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const { setting } = useSettingsContext();
+  const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+
+  const [loading, setLoading] = useState(true);
+  const [attendee, setAttendee] = useState<AttendeeRecord | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [updating, setUpdating] = useState(false);
+
+  const attendeeId = searchParams.get("attendeeId");
+  const eventId = searchParams.get("eventId");
+  const ticketId = searchParams.get("ticketId");
+
+  useEffect(() => {
+    if (!attendeeId) {
+      setError("Invalid QR Code: Missing Attendee ID");
+      setLoading(false);
+      return;
+    }
+
+    const loadAttendee = async () => {
+      try {
+        const data = await dispatch(fetchAttendeeById({
+          id: attendeeId,
+          eventId: eventId || undefined,
+          ticketId: ticketId || undefined
+        })).unwrap();
+        setAttendee(data);
+      } catch (err: any) {
+        setError(err || "Failed to load attendee details");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadAttendee();
+  }, [attendeeId, eventId, ticketId, dispatch]);
+
+  const handleMarkAsUsed = async () => {
+    if (!attendee) return;
+    
+    setUpdating(true);
+    try {
+      const payload = { 
+        ticketStatus: "Used",
+        checkInTime: new Date().toISOString()
+      };
+      const updateId = (attendee._id || attendee.id || attendeeId) as string;
+      await dispatch(updateAttendee({ id: updateId, payload })).unwrap();
+      
+      setAttendee({ ...attendee, ticketStatus: "Used" });
+      
+      Swal.fire({
+        title: "Success",
+        text: "Ticket marked as Used!",
+        icon: "success",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#6259ca"
+      });
+    } catch (err: any) {
+      Swal.fire({
+        title: "Attention!",
+        text: err || "Failed to update ticket status",
+        icon: "warning",
+        confirmButtonColor: "#d33"
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center">
+        <Spinner animation="border" variant="primary" />
+        <span className="ms-3">Loading ticket details...</span>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card className="text-center p-5 shadow-sm border-0">
+        <Icon icon="mdi:close-circle" width="60" className="text-danger mx-auto mb-3" />
+        <h4 className="text-danger mb-3">Attention!</h4>
+        <p className="text-muted mb-4">
+          {error.toLowerCase().includes("not found")
+            ? "Invalid QR Code. This ticket may have been deleted or does not exist in the database."
+            : error}
+        </p>
+        <div className="d-flex justify-content-center gap-2">
+          <Button variant="primary" onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+          <Button variant="outline-secondary" onClick={() => router.push("/admin/attendees")}>
+            Back to Attendees
+          </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  if (!attendee) return null;
+
+  const isUsed = attendee.ticketStatus === "Used";
+  const isCancelled = attendee.ticketStatus === "Cancelled";
+  const rawPayStatus = (
+    attendee.paymentStatus || 
+    (typeof attendee.bookingId === 'object' ? attendee.bookingId?.paymentStatus : undefined) || 
+    'Success'
+  ).toString();
+  const isPaymentValid = ['success', 'completed', 'free'].includes(rawPayStatus.toLowerCase());
+
+  const rawTicketName = (
+    attendee.ticketName || 
+    (typeof attendee.ticketId === 'object' ? attendee.ticketId?.ticketName : attendee.ticketId) || 
+    'Event Ticket'
+  ).toString();
+  const cleanBaseName = rawTicketName.replace(/\s*\(Under\s*\d+[^)]*\)/gi, '').trim();
+  const isAccompanyingUnderAge =
+    attendee.age &&
+    !isNaN(parseInt(attendee.age as string)) &&
+    parseInt(attendee.age as string) <= underAgeLimit &&
+    (cleanBaseName.toLowerCase().includes('accompanying') || rawTicketName.toLowerCase().includes('accompanying'));
+  const displayTicketType = isAccompanyingUnderAge
+    ? `${cleanBaseName} (Under ${underAgeLimit})`
+    : rawTicketName;
+  const eventTitle = typeof attendee.eventId === 'object' ? attendee.eventId?.title : (attendee.eventId || 'AISGWB Event');
+
+  return (
+    <Card className="border-0 mx-auto">
+      <Card.Body className="text-center">
+        <div className="mb-4">
+          <Icon 
+            icon={isUsed ? "mdi:ticket-confirmation" : (isCancelled ? "mdi:ticket-percent" : "mdi:qrcode-scan")} 
+            width="80" 
+            className={isUsed ? "text-success" : (isCancelled ? "text-danger" : "text-primary")} 
+          />
+        </div>
+        
+        <h3 className="fw-bold mb-2">{attendee.name}</h3>
+        <p className="text-muted mb-4">Ticket Verification</p>
+
+        <div className="bg-light rounded p-4 mb-4 text-start">
+          <Row className="mb-3">
+            <Col xs={5} className="text-muted fw-bold small text-uppercase">Ticket Status</Col>
+            <Col xs={7}>
+              {isUsed && <span className="badge bg-success">Used</span>}
+              {isCancelled && <span className="badge bg-danger">Cancelled</span>}
+              {!isUsed && !isCancelled && <span className="badge bg-primary">Unused</span>}
+            </Col>
+          </Row>
+          <Row className="mb-3">
+            <Col xs={5} className="text-muted fw-bold small text-uppercase">Payment Status</Col>
+            <Col xs={7}>
+              <span className={`badge ${isPaymentValid ? 'bg-success' : (rawPayStatus.toLowerCase() === 'failed' ? 'bg-danger' : 'bg-warning')}`}>
+                {rawPayStatus}
+              </span>
+            </Col>
+          </Row>
+          <Row className="mb-3">
+            <Col xs={5} className="text-muted fw-bold small text-uppercase">Ticket Type</Col>
+            <Col xs={7} className="fw-medium">
+              {displayTicketType}
+            </Col>
+          </Row>
+          <Row>
+            <Col xs={5} className="text-muted fw-bold small text-uppercase">Event</Col>
+            <Col xs={7} className="fw-medium">{eventTitle}</Col>
+          </Row>
+        </div>
+
+        {isCancelled ? (
+          <Alert variant="danger">
+            This ticket has been cancelled. Do not allow entry.
+          </Alert>
+        ) : !isPaymentValid ? (
+          <Alert variant="warning">
+            Payment status is <strong>{attendee.paymentStatus}</strong>. Entry cannot be granted.
+          </Alert>
+        ) : isUsed ? (
+          <Alert variant="success" className="mb-0">
+            <Icon icon="mdi:check-circle" className="me-2" />
+            This ticket has already been used!
+          </Alert>
+        ) : (
+          <Button 
+            variant="primary" 
+            size="lg" 
+            className="w-100 py-3 fw-bold"
+            onClick={handleMarkAsUsed}
+            disabled={updating}
+          >
+            {updating ? (
+              <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2"/> Updating...</>
+            ) : (
+              "Mark Ticket as Used"
+            )}
+          </Button>
+        )}
+        
+        <div className="mt-4">
+          <Button variant="link" className="text-muted text-decoration-none" onClick={() => router.push("/admin/attendees")}>
+            <Icon icon="mdi:arrow-left" className="me-1" /> Back to Attendees
+          </Button>
+        </div>
+      </Card.Body>
+    </Card>
+  );
+};
+
+export default ScannerContent;
