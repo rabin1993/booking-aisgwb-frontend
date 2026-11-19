@@ -50,28 +50,23 @@ const LoginForm = () => {
       setLocalError("Please enter your email or mobile number first.");
       toast.error("Please enter your email or mobile number first.");
       return;
-    }else{
-      setLocalError("Work in progress... Please wait. Something good is coming soon");
-      toast.error("Work in progress... Please wait. Something good is coming soon");
     }
-    setLocalError(null);
-    
-    //----------off---------//
-    //setLoading(true);
-    // try {
-    //   await dispatch(frontendLoginSendOtp({ identifier })).unwrap();
+    setLocalError(null);    
+    setLoading(true);
+    try {
+      const res = await dispatch(frontendLoginSendOtp({ identifier: identifier.trim() })).unwrap();
 
-    //   setOtpSent(true);
-    //   setCountdown(60);
-    //   toast.success(`Verification code sent to ${identifier}`);
-    // } catch (err: any) {
-    //   const errorMsg = typeof err === 'string' ? err : err?.message || "Failed to send OTP.";
-    //   setLocalError(errorMsg);
-    //   toast.error(errorMsg);
-    // } finally {
-    //   setLoading(false);
-    // }
-    //----------off---------//
+      setOtpSent(true);
+      setCountdown(60);
+      const successMsg = res?.message || res?.data?.message || `Verification code sent to ${identifier.trim()}`;
+      toast.success(successMsg);
+    } catch (err: any) {
+      const errorMsg = typeof err === 'string' ? err : err?.message || "Failed to send OTP.";
+      setLocalError(errorMsg);
+      toast.error(errorMsg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -87,7 +82,7 @@ const LoginForm = () => {
       }
 
       setLoading(true);
-      await dispatch(frontendVerifyLoginOtp({ identifier, otp: fullOtp })).unwrap();
+      await dispatch(frontendVerifyLoginOtp({ identifier: identifier.trim(), otp: fullOtp })).unwrap();
 
       sessionStorage.setItem("show_frontend_login_toast", "true");
 

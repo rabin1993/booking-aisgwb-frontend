@@ -34,62 +34,58 @@ const Forms = () => {
     e.preventDefault();
     setError(null);
     setErrors({});
-    setError("Work in progress... Please wait. Something good is coming soon");
-    toast.error("Work in progress... Please wait. Something good is coming soon");
-    //----------off---------//
-    // const newErrors: Record<string, string> = {};
 
-    // if (!fullName.trim()) newErrors.fullName = "Full Name is required";
-    // if (!email.trim()) newErrors.email = "Email Address is required";
-    // if (!mobileNo.trim()) newErrors.mobileNo = "Mobile Number is required";
-    // if (!sex) newErrors.sex = "Sex is required";
+    const newErrors: Record<string, string> = {};
 
-    // if (Object.keys(newErrors).length > 0) {
-    //   setErrors(newErrors);
-    //   return;
-    // }
+    if (!fullName.trim()) newErrors.fullName = "Full Name is required";
+    if (!email.trim()) newErrors.email = "Email Address is required";
+    if (!mobileNo.trim()) newErrors.mobileNo = "Mobile Number is required";
+    if (!sex) newErrors.sex = "Sex is required";
 
-    // if (!agreeTerms) {
-    //   setError("Please agree to the Terms & Policy to register.");
-    //   return;
-    // }
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
 
-    // try {
-    //   setLoading(true);
-    //   setError(null);
+    if (!agreeTerms) {
+      setError("Please agree to the Terms & Policy to register.");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
       
-    //   const payload = {
-    //     name: fullName.trim(),
-    //     groupId: "GRP-3",
-    //     sex,
-    //     email: email.trim(),
-    //     mobile: mobileNo.trim(),
-    //     username: email.trim(),
-    //     password: "TempPassword123!",
-    //   };
+      const payload = {
+        name: fullName.trim(),
+        groupId: "GRP-3",
+        sex,
+        email: email.trim(),
+        mobile: mobileNo.trim(),
+        username: email.trim(),
+        password: "TempPassword123!",
+      };
 
-    //   await dispatch(frontendSendOtp(payload)).unwrap();
+      await dispatch(frontendSendOtp(payload)).unwrap();
 
-    //   setStep(2);
-    //   import("react-hot-toast").then((toast) => toast.default.success(`Verification code sent to ${email}`));
-    // } catch (err: any) {
-    //   const msg = err.message || err || "Failed to send OTP. Please try again.";
-    //   if (typeof msg === "string") {
-    //     if (msg.toLowerCase().includes("email")) {
-    //       setErrors((prev) => ({ ...prev, email: msg }));
-    //     } else if (msg.toLowerCase().includes("mobile")) {
-    //       setErrors((prev) => ({ ...prev, mobileNo: msg }));
-    //     } else {
-    //       setError(msg);
-    //     }
-    //   } else {
-    //     setError("Failed to send OTP. Please try again.");
-    //   }
-    // } finally {
-    //   setLoading(false);
-    // }
-    
-    //----------off---------//
+      setStep(2);
+      toast.success(`Verification code sent to ${email.trim()}`);
+    } catch (err: any) {
+      const msg = typeof err === "string" ? err : err?.message || "Failed to send OTP. Please try again.";
+      if (typeof msg === "string") {
+        if (msg.toLowerCase().includes("email")) {
+          setErrors((prev) => ({ ...prev, email: msg }));
+        } else if (msg.toLowerCase().includes("mobile")) {
+          setErrors((prev) => ({ ...prev, mobileNo: msg }));
+        } else {
+          setError(msg);
+        }
+      } else {
+        setError("Failed to send OTP. Please try again.");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleCompleteRegistration = async (e: FormEvent) => {

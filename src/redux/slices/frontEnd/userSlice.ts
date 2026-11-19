@@ -53,10 +53,11 @@ export const frontendLoginSendOtp = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
+      const trimmed = payload.identifier.trim();
       const response = await fetch(`${API_BASE_URL}/login/send-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, email: payload.identifier }),
+        body: JSON.stringify({ identifier: trimmed, email: trimmed, mobile: trimmed }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -89,10 +90,12 @@ export const frontendVerifyLoginOtp = createAsyncThunk(
     { rejectWithValue }
   ) => {
     try {
+      const trimmed = payload.identifier.trim();
+      const trimmedOtp = payload.otp.trim();
       const response = await fetch(`${API_BASE_URL}/login/verify-otp`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, email: payload.identifier }),
+        body: JSON.stringify({ identifier: trimmed, email: trimmed, mobile: trimmed, otp: trimmedOtp }),
       });
       const data = await response.json();
       if (!response.ok) {
