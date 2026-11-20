@@ -1,3 +1,4 @@
+"use client";
 import AppLogo from "@/components/AppLogo";
 import { SimpleBar } from "@/components/wrappers/SimpleBar";
 import AppMenu from "./components/AppMenu";

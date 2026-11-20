@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect } from 'react';
 import { Modal, Badge, Table, Button } from 'react-bootstrap';
 import { Booking, resendBookingInvoice } from '@/redux/slices/admin/bookingSlice';

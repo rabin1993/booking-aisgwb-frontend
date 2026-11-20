@@ -1,3 +1,4 @@
+"use client";
 import React from "react";
 import { useSettingsContext } from "@/context/useSettingsContext";
 import Image from "next/image";

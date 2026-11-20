@@ -1,3 +1,4 @@
+"use client";
 import React, { useState, useEffect, useMemo } from "react";
 import { Modal, Button, Form, Row, Col } from "react-bootstrap";
 import Select from "@/components/wrappers/Select";

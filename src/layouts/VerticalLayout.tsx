@@ -1,3 +1,4 @@
+"use client";
 import Customizer from "@/layouts/components/Customizer";
 import Footer from "@/layouts/components/Footer";
 import Sidenav from "@/layouts/components/Sidenav";

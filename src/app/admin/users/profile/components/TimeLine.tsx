@@ -1,3 +1,4 @@
+"use client";
 import small1 from "@/assets/images/stock/small-1.jpg";
 import small2 from "@/assets/images/stock/small-2.jpg";
 import small3 from "@/assets/images/stock/small-3.jpg";

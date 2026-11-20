@@ -1,3 +1,4 @@
+"use client";
 import React, { useRef } from "react";
 import { Modal, Button, Row, Col } from "react-bootstrap";
 import { AttendeeRecord } from "@/app/admin/dataStore";

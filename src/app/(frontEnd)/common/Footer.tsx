@@ -1,3 +1,4 @@
+"use client";
 import { currentYear, META_DATA } from "@/config/constants";
 import { Icon as IconifyIcon } from "@iconify/react";
 import Link from "next/link";

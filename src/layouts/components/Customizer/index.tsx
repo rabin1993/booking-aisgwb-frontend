@@ -1,3 +1,4 @@
+"use client";
 import settingsBg from "@/assets/images/settings-bg.png";
 import Icon from "@/components/wrappers/Icon";
 import { SimpleBar } from "@/components/wrappers/SimpleBar";
