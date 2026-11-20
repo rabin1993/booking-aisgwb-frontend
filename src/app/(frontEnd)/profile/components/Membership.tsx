@@ -7,7 +7,6 @@ import { RootState } from "@/redux/store";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useSettingsContext } from "@/context/useSettingsContext";
-import logo from "@/assets/images/logo.png";
 import { Image } from "react-bootstrap";
 import dayjs from "dayjs";
 
@@ -78,7 +77,7 @@ const Membership = () => {
     >
       <div className="d-flex justify-content-center mb-3">
         <Image
-          src={setting("general.logo", logo.src)}
+          src={setting("general.logo", "/images/logo.png")}
           alt="AISGWB Logo"
           style={{
             height: "135px",
@@ -139,7 +138,7 @@ const Membership = () => {
               {/* <div className="card-chip"></div> */}
               <div className="card-logo">
                 <Image
-                  src={setting("general.logo", logo.src)}
+                  src={setting("general.logo", "/images/logo.png")}
                   alt="AISGWB"
                   crossOrigin="anonymous"
                 />

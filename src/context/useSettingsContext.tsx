@@ -79,9 +79,13 @@ export const setting = (key: string, fallback?: any): any => {
   const defaultFallback =
     fallback !== undefined
       ? fallback
-      : key.includes("title")
-        ? META_DATA.title
-        : "";
+      : key.includes("favicon")
+        ? "/images/favicon.ico"
+        : key.includes("logo")
+          ? "/images/logo.png"
+          : key.includes("title")
+            ? META_DATA.title
+            : "";
   return getSettingValue(currentSettings, key, defaultFallback);
 };
 
@@ -144,25 +148,30 @@ export const SettingsProvider = ({
       }
 
       // 2. Sync Dynamic Favicon (general.favicon)
-      const siteFavicon =
+      const rawFavicon =
         getSettingValue(items, "general.favicon", "") ||
         getSettingValue(items, "setting('general.favicon')", "");
-      if (siteFavicon && typeof siteFavicon === "string") {
-        const cleanFavicon = siteFavicon.trim();
-        if (
-          cleanFavicon &&
-          !cleanFavicon.startsWith("blob:") &&
-          !cleanFavicon.startsWith("file:")
-        ) {
-          let link: HTMLLinkElement | null =
-            document.querySelector("link[rel*='icon']");
-          if (!link) {
-            link = document.createElement("link");
-            link.rel = "icon";
-            document.head.appendChild(link);
-          }
-          link.href = cleanFavicon;
+      const siteFavicon =
+        rawFavicon && typeof rawFavicon === "string" && rawFavicon.trim()
+          ? rawFavicon.trim()
+          : "/images/favicon.ico";
+
+      if (
+        siteFavicon &&
+        !siteFavicon.startsWith("blob:") &&
+        !siteFavicon.startsWith("file:")
+      ) {
+        let link: HTMLLinkElement | null =
+          document.querySelector("link[rel*='icon']");
+        if (!link) {
+          link = document.createElement("link");
+          link.rel = "icon";
+          document.head.appendChild(link);
         }
+        link.href =
+          siteFavicon.startsWith("http") || siteFavicon.startsWith("/")
+            ? siteFavicon
+            : `/${siteFavicon}`;
       }
     }
   }, []);

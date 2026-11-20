@@ -1,7 +1,6 @@
 import React, { forwardRef } from "react";
 import Image from "next/image";
 import dayjs from "dayjs";
-import logo from "@/assets/images/logo.png";
 import { setting } from "@/context/useSettingsContext";
 
 interface TicketTemplateProps {
@@ -65,7 +64,7 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
         <div className="left">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={setting("general.logo", logo.src)}
+            src={setting("general.logo", "/images/logo.png")}
             alt="Event Logo" 
             className="event-logo"
             crossOrigin="anonymous"

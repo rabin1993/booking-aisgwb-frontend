@@ -6,7 +6,7 @@ import clsx from "clsx";
 import { useSettingsContext } from "@/context/useSettingsContext";
 import { useLayoutContext } from "@/context/useLayoutContext";
 
-import logo from "@/assets/images/logo.png";
+const DEFAULT_LOGO = "/images/logo.png";
 
 const AppLogo = () => {
   const { setting } = useSettingsContext();
@@ -19,21 +19,21 @@ const AppLogo = () => {
     theme === "dark";
 
   const [imgError, setImgError] = useState(false);
-  const logoLightSrc = setting("general.logo", logo);
+  const logoLightSrc = setting("general.logo", DEFAULT_LOGO);
   const logoDarkSrc = setting("general.logo_dark", logoLightSrc);
   const rawLogo = isDarkMenu ? logoLightSrc : logoDarkSrc;
 
   const currentLogo = useMemo(() => {
-    if (imgError || !rawLogo) return logo;
-    if (typeof rawLogo === "object" && rawLogo.src) return rawLogo;
+    if (imgError || !rawLogo) return DEFAULT_LOGO;
+    if (typeof rawLogo === "object" && rawLogo.src) return rawLogo.src;
     if (typeof rawLogo === "string") {
       const clean = rawLogo.trim();
-      if (!clean || clean === "null" || clean === "undefined") return logo;
+      if (!clean || clean === "null" || clean === "undefined") return DEFAULT_LOGO;
       if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) return clean;
       if (clean.startsWith("/")) return clean;
       return `/${clean}`;
     }
-    return logo;
+    return DEFAULT_LOGO;
   }, [rawLogo, imgError]);
 
   const siteTitle = setting("general.title", "AISGWB");

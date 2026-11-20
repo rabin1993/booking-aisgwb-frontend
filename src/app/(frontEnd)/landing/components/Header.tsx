@@ -1,7 +1,6 @@
 "use client";
 
-import logo from "@/assets/images/logo.png";
-import logoSm from "@/assets/images/logo-sm.png";
+const DEFAULT_LOGO = "/images/logo.png";
 import Icon from "@/components/wrappers/Icon";
 import { useLayoutContext } from "@/context/useLayoutContext";
 import useScrollEvent from "@/hooks/useScrollEvent";
@@ -41,7 +40,7 @@ export default function Header() {
 
   const siteLogoSrc = useMemo(() => {
     if (logoError || !currentLogoSetting) {
-      return logo.src;
+      return DEFAULT_LOGO;
     }
     if (typeof currentLogoSetting === "object" && currentLogoSetting.src) {
       return currentLogoSetting.src;
@@ -49,7 +48,7 @@ export default function Header() {
     if (typeof currentLogoSetting === "string") {
       const clean = currentLogoSetting.trim();
       if (!clean || clean === "null" || clean === "undefined") {
-        return logo.src;
+        return DEFAULT_LOGO;
       }
       if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) {
         return clean;
@@ -59,7 +58,7 @@ export default function Header() {
       }
       return `/${clean}`;
     }
-    return logo.src;
+    return DEFAULT_LOGO;
   }, [currentLogoSetting, logoError]);
 
   return (

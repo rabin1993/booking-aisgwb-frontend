@@ -1,4 +1,4 @@
-﻿export interface UserRecord {
+export interface UserRecord {
   id: string;
   _id?: string;
   name: string;
@@ -236,8 +236,8 @@ export const initialWebsiteSettings: WebsiteSettingItem[] = [
     key: "general.favicon",
     type: "file",
     group: "General",
-    value: "/images/logo.png",
-    previewUrl: "/images/logo.png",
+    value: "/images/favicon.ico",
+    previewUrl: "/images/favicon.ico",
   },
   {
     id: "SET-4",

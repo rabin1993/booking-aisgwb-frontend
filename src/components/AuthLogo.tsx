@@ -3,8 +3,7 @@
   import Image from "next/image";
   import { useSettingsContext } from "@/context/useSettingsContext";
 
-  import logoBlack from "@/assets/images/logo-black.png";
-  import logo from "@/assets/images/logo.png";
+  const DEFAULT_LOGO = "/images/logo.png";
 
   const AuthLogo = () => {
     const { setting } = useSettingsContext();
@@ -13,20 +12,22 @@
       <>
         <Link href="/" className="logo-dark">
           <Image 
-            src={setting("general.logo_dark", setting("general.logo", logo.src))} 
+            src={setting("general.logo_dark", setting("general.logo", DEFAULT_LOGO))} 
             alt="dark logo" 
             width={120}
             height={32} 
             style={{ objectFit: 'contain', width: 'auto' }}
+            unoptimized
           />
         </Link>
         <Link href="/" className="logo-light">
           <Image 
-            src={setting("general.logo", logo.src)} 
+            src={setting("general.logo", DEFAULT_LOGO)} 
             alt="logo" 
             width={120}
             height={32} 
             style={{ objectFit: 'contain', width: 'auto' }}
+            unoptimized
           />
         </Link>
       </>

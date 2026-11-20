@@ -1,4 +1,3 @@
-import favicon from "@/assets/images/logo.png";
 import AppProvidersWrapper from "@/components/wrappers/AppProvidersWrapper";
 import { META_DATA } from "@/config/constants";
 import type { Metadata } from "next";
@@ -13,7 +12,14 @@ export const metadata: Metadata = {
   description: META_DATA.description,
   keywords: META_DATA.keywords,
   authors: [{ name: META_DATA.author }],
-  icons: { icon: favicon.src },
+  icons: {
+    icon: [
+      { url: "/images/favicon.ico" },
+      { url: "/favicon.ico" },
+    ],
+    shortcut: "/images/favicon.ico",
+    apple: "/images/logo.png",
+  },
 };
 
 export default function RootLayout({
@@ -24,6 +30,8 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        <link rel="icon" href="/images/favicon.ico" sizes="any" />
+        <link rel="shortcut icon" href="/images/favicon.ico" />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link
           rel="preconnect"

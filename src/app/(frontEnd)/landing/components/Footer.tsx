@@ -1,4 +1,3 @@
-import logo from "@/assets/images/logo.png";
 import { currentYear, META_DATA } from "@/config/constants";
 import { Icon as IconifyIcon } from "@iconify/react";
 import Image from "next/image";
@@ -12,7 +11,7 @@ const Footer = () => {
       <Container>
         <Row className="g-4 justify-content-between">
           <Col lg={3}>
-            <Image src={logo} alt="logo" height={24} />
+            <Image src="/images/logo.png" alt="logo" height={24} width={100} style={{ objectFit: 'contain' }} unoptimized />
             <p className="mt-3 fs-sm">
               UBold is a best-selling admin dashboard template on ThemeForest,
               recognized for its clean design, versatility, and robust features.

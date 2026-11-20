@@ -1,6 +1,5 @@
 import React from "react";
 import { useSettingsContext } from "@/context/useSettingsContext";
-import logo from "@/assets/images/logo.png";
 import Image from "next/image";
 
 export interface TransactionTicket {
@@ -39,7 +38,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, u
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
         <div>
           <Image
-            src={setting("general.logo", logo.src)}
+            src={setting("general.logo", "/images/logo.png")}
             alt={setting("general.title", "AISGWB")}
             width={86}
             height={135}

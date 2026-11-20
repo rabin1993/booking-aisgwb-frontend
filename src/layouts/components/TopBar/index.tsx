@@ -17,15 +17,15 @@ import { useLayoutContext } from "@/context/useLayoutContext";
 
 import logoBlack from "@/assets/images/logo-black.png";
 import logoSm from "@/assets/images/logo-sm.png";
-import logo from "@/assets/images/logo.png";
 
 const TopBar = () => {
   const { scrollY } = useScrollEvent();
   const { setting } = useSettingsContext();
   const { sidenavSize, topbarColor, theme } = useLayoutContext();
 
+  const DEFAULT_LOGO = "/images/logo.png";
   const isDarkTopbar = topbarColor === "dark" || topbarColor === "gradient" || theme === "dark";
-  const logoLightSrc = setting("general.logo", logo.src);
+  const logoLightSrc = setting("general.logo", DEFAULT_LOGO);
   const logoDarkSrc = setting("general.logo_dark", logoLightSrc);
   const currentLogoSrc = isDarkTopbar ? logoLightSrc : logoDarkSrc;
   const siteTitle = setting("general.title", "AISGWB");
