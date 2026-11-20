@@ -12,8 +12,19 @@ import {
   FormCheck,
   FormControl,
   FormLabel,
+  InputGroup,
 } from "react-bootstrap";
 import toast from "react-hot-toast";
+
+const cleanMobileNumber = (val: string): string => {
+  let cleaned = val.replace(/\D/g, "");
+  if (cleaned.length === 12 && cleaned.startsWith("91")) {
+    cleaned = cleaned.slice(2);
+  } else if (cleaned.length === 11 && cleaned.startsWith("0")) {
+    cleaned = cleaned.slice(1);
+  }
+  return cleaned;
+};
 
 const Forms = () => {
   const dispatch = useDispatch<AppDispatch>();
@@ -36,10 +47,22 @@ const Forms = () => {
     setErrors({});
 
     const newErrors: Record<string, string> = {};
+    const cleanMobile = cleanMobileNumber(mobileNo);
 
     if (!fullName.trim()) newErrors.fullName = "Full Name is required";
-    if (!email.trim()) newErrors.email = "Email Address is required";
-    if (!mobileNo.trim()) newErrors.mobileNo = "Mobile Number is required";
+    
+    if (!email.trim()) {
+      newErrors.email = "Email Address is required";
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      newErrors.email = "Please enter a valid email address";
+    }
+
+    if (!cleanMobile) {
+      newErrors.mobileNo = "Mobile Number is required";
+    } else if (!/^[6-9]\d{9}$/.test(cleanMobile)) {
+      newErrors.mobileNo = "Please enter a valid 10-digit Indian mobile number (e.g. 9876543210)";
+    }
+
     if (!sex) newErrors.sex = "Sex is required";
 
     if (Object.keys(newErrors).length > 0) {
@@ -61,21 +84,25 @@ const Forms = () => {
         groupId: "GRP-3",
         sex,
         email: email.trim(),
-        mobile: mobileNo.trim(),
+        mobile: cleanMobile,
         username: email.trim(),
         password: "TempPassword123!",
       };
 
-      await dispatch(frontendSendOtp(payload)).unwrap();
+      const res = await dispatch(frontendSendOtp(payload)).unwrap();
 
       setStep(2);
-      toast.success(`Verification code sent to ${email.trim()}`);
+      const successMsg =
+        res?.data?.message ||
+        res?.message ||
+        `Verification code sent to ${email.trim()} and +91 ${cleanMobile}`;
+      toast.success(successMsg);
     } catch (err: any) {
       const msg = typeof err === "string" ? err : err?.message || "Failed to send OTP. Please try again.";
       if (typeof msg === "string") {
         if (msg.toLowerCase().includes("email")) {
           setErrors((prev) => ({ ...prev, email: msg }));
-        } else if (msg.toLowerCase().includes("mobile")) {
+        } else if (msg.toLowerCase().includes("mobile") || msg.toLowerCase().includes("phone")) {
           setErrors((prev) => ({ ...prev, mobileNo: msg }));
         } else {
           setError(msg);
@@ -172,19 +199,36 @@ const Forms = () => {
               <FormLabel className="fw-semibold">
                 Mobile Number <span className="text-danger">*</span>
               </FormLabel>
-              <FormControl
-                type="text"
-                placeholder="Enter mobile number"
-                value={mobileNo}
-                onChange={(e) => {
-                  setMobileNo(e.target.value);
-                  if (errors.mobileNo) setErrors((prev) => ({ ...prev, mobileNo: "" }));
-                }}
-                isInvalid={!!errors.mobileNo}
-              />
-              <Form.Control.Feedback type="invalid" className="fs-13">
-                {errors.mobileNo}
-              </Form.Control.Feedback>
+              <InputGroup hasValidation>
+                <InputGroup.Text className="bg-light text-muted fw-semibold fs-13">
+                  +91
+                </InputGroup.Text>
+                <FormControl
+                  type="tel"
+                  placeholder="Enter 10-digit mobile number"
+                  maxLength={10}
+                  value={mobileNo}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    let digits = raw.replace(/\D/g, "");
+                    if (digits.length === 12 && digits.startsWith("91")) {
+                      digits = digits.slice(2);
+                    } else if (digits.length === 11 && digits.startsWith("0")) {
+                      digits = digits.slice(1);
+                    }
+                    digits = digits.slice(0, 10);
+                    setMobileNo(digits);
+                    if (errors.mobileNo) setErrors((prev) => ({ ...prev, mobileNo: "" }));
+                  }}
+                  isInvalid={!!errors.mobileNo}
+                />
+                <Form.Control.Feedback type="invalid" className="fs-13">
+                  {errors.mobileNo}
+                </Form.Control.Feedback>
+              </InputGroup>
+              <small className="text-muted fs-11 mt-1 d-block">
+                Enter valid 10-digit Indian mobile number (e.g. 9876543210)
+              </small>
             </div>
           </div>
 
@@ -259,10 +303,20 @@ const Forms = () => {
       ) : (
         <Form onSubmit={handleCompleteRegistration}>
           <div className="p-3 bg-light rounded border mb-3">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <span className="fs-13 fw-semibold text-success d-flex align-items-center gap-1">
-                <Icon icon="check-circle" /> OTP Sent to {email}
+            <div className="mb-3">
+              <span className="fs-14 fw-semibold text-success d-flex align-items-center gap-1 mb-2">
+                <Icon icon="check-circle" className="fs-16" /> Verification Code Sent!
               </span>
+              <div className="p-2 rounded bg-white border fs-12 text-muted d-flex flex-column gap-1">
+                <div className="d-flex align-items-center gap-2">
+                  <Icon icon="mail" className="text-primary flex-shrink-0" />
+                  <span>Email: <strong className="text-dark">{email.trim()}</strong></span>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  <Icon icon="phone" className="text-success flex-shrink-0" />
+                  <span>Mobile: <strong className="text-dark">+91 {cleanMobileNumber(mobileNo)}</strong></span>
+                </div>
+              </div>
             </div>
 
             <OTPInput
