@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import AttendeeList from './AttendeeList';
+import AttendeeList, { Attendee, calculateAgeFromDob } from './AttendeeList';
 import BookingSummary from './BookingSummary';
 import { useRouter } from 'next/navigation';
 import { useSettingsContext } from '@/context/useSettingsContext';
@@ -26,6 +26,7 @@ const CheckoutClient = () => {
     
     const { setting } = useSettingsContext();
     const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+    const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
     
     const dispatch = useDispatch<AppDispatch>();
     const { currentEvent } = useSelector((state: RootState) => state.frontendEvents);
@@ -35,8 +36,8 @@ const CheckoutClient = () => {
     
     const [pdfGenerationData, setPdfGenerationData] = useState<{bookingId: string, attendees: any[]} | null>(null);
 
-    const [attendees, setAttendees] = useState<{ id: number; name: string; age: string; relation: string; ticketName: string; isPrimary?: boolean }[]>([
-        { id: 1, name: '', age: '', relation: '', ticketName: '' }
+    const [attendees, setAttendees] = useState<Attendee[]>([
+        { id: 1, name: '', age: '', date_of_birth: '', relation: '', ticketName: '' }
     ]);
     const [invalidAttendeeIds, setInvalidAttendeeIds] = useState<number[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
@@ -89,14 +90,19 @@ const CheckoutClient = () => {
                         }
                     } catch(e) {}
 
-                    const initialAttendees: { id: number; name: string; age: string; relation: string; ticketName: string; isPrimary?: boolean }[] = [];
+                    const initialAttendees: Attendee[] = [];
                     let idCounter = Date.now();
                     let userAssigned = false;
                     if (data.tickets && data.tickets.length > 0) {
                         data.tickets.forEach((t: any) => {
                             const accPersonGroupId = process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID;
                             const tGroupIdStr = (t.groupId as any)?._id || t.groupId || "";
-                            const isPrimary = Boolean((tGroupIdStr && tGroupIdStr !== accPersonGroupId) && !t.name?.toLowerCase().includes('accompany'));
+                            const isAccompanyingTicket = Boolean(
+                                t.isAccompanying ||
+                                t.name?.toLowerCase().includes('accompany') ||
+                                (accPersonGroupId && tGroupIdStr && tGroupIdStr === accPersonGroupId)
+                            );
+                            const isPrimary = !isAccompanyingTicket;
 
                             for (let i = 0; i < t.quantity; i++) {
                                 let prefillName = '';
@@ -109,6 +115,7 @@ const CheckoutClient = () => {
                                     id: idCounter++,
                                     name: prefillName,
                                     age: '',
+                                    date_of_birth: '',
                                     relation: '',
                                     ticketName: t.name,
                                     isPrimary: isPrimary
@@ -121,6 +128,7 @@ const CheckoutClient = () => {
                                 id: idCounter++,
                                 name: initialAttendees.length === 0 ? loggedInUserName : '',
                                 age: '',
+                                date_of_birth: '',
                                 relation: '',
                                 ticketName: 'Attendee Pass',
                                 isPrimary: true
@@ -193,10 +201,38 @@ const CheckoutClient = () => {
 
 
     const handleAttendeeChange = (id: number, field: string, value: string) => {
-        setAttendees(attendees.map(a => a.id === id ? { ...a, [field]: value } : a));
-        if (field === 'name' && value.trim() !== '') {
-            setInvalidAttendeeIds(prev => prev.filter(invalidId => invalidId !== id));
-        }
+        setAttendees(prev => prev.map(a => {
+            if (a.id !== id) return a;
+            if (field === 'date_of_birth') {
+                const computedAge = calculateAgeFromDob(value);
+                return { ...a, date_of_birth: value, age: computedAge };
+            }
+            return { ...a, [field]: value };
+        }));
+
+        setInvalidAttendeeIds(prev => {
+            const attendee = attendees.find(a => a.id === id);
+            if (!attendee) return prev;
+            const updated = { 
+                ...attendee, 
+                [field]: value,
+                ...(field === 'date_of_birth' ? { age: calculateAgeFromDob(value) } : {})
+            };
+            const hasName = Boolean(updated.name && updated.name.trim() !== '');
+            if (updated.isPrimary !== false) {
+                const hasDob = Boolean(updated.date_of_birth && updated.date_of_birth.trim() !== '');
+                if (hasName && hasDob) {
+                    return prev.filter(invalidId => invalidId !== id);
+                }
+            } else {
+                const hasAge = Boolean(updated.age && updated.age.trim() !== '');
+                const hasRelation = Boolean(updated.relation && updated.relation.trim() !== '');
+                if (hasName && hasAge && hasRelation) {
+                    return prev.filter(invalidId => invalidId !== id);
+                }
+            }
+            return prev;
+        });
     };
 
     const handleGoBack = () => {
@@ -218,43 +254,50 @@ const CheckoutClient = () => {
         router.back();
     };
 
+    const getTicketInfoForAttendee = React.useCallback((a: Attendee) => {
+        const ticket = tickets.find(t => t.name === a.ticketName);
+        const ageNum = parseInt(a.age);
+        const isUnderAge = !a.isPrimary && !isNaN(ageNum) && ageNum <= underAgeLimit;
+        const isAboveAge = a.isPrimary && !isNaN(ageNum) && ageNum >= agedAboveLimit;
+        const shouldShowAge = isUnderAge || isAboveAge;
+        const finalPrice = shouldShowAge ? 0 : (ticket?.price || 0);
+        const cleanBase = (a.ticketName || ticket?.name || 'Ticket').replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
+        const finalName = shouldShowAge && a.age ? `${cleanBase} (Aged ${a.age})` : cleanBase;
+        return { ticket, ageNum, isUnderAge, isAboveAge, shouldShowAge, finalPrice, finalName, cleanBase };
+    }, [tickets, underAgeLimit, agedAboveLimit]);
+
     const processedTickets = React.useMemo(() => {
         if (!tickets || tickets.length === 0) return [];
         const result: {name: string, quantity: number, price: number, originalId?: any, groupId?: any, isAccompanying?: boolean}[] = [];
         
         attendees.forEach(a => {
-            const ticket = tickets.find(t => t.name === a.ticketName);
-            if (ticket) {
-                const ageNum = parseInt(a.age);
-                const isUnderAge = !a.isPrimary && !isNaN(ageNum) && ageNum <= underAgeLimit;
-                const finalPrice = isUnderAge ? 0 : ticket.price;
-                const finalName = isUnderAge ? `${ticket.name} (Under ${underAgeLimit})` : ticket.name;
-                
-                const existing = result.find(r => r.name === finalName && r.price === finalPrice);
+            const info = getTicketInfoForAttendee(a);
+            if (info.ticket) {
+                const existing = result.find(r => r.name === info.finalName && r.price === info.finalPrice);
                 if (existing) {
                     existing.quantity += 1;
                 } else {
                     const accPersonGroupId = process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID;
-                    const tGroupIdStr = ((ticket as any).groupId as any)?._id || (ticket as any).groupId || "";
+                    const tGroupIdStr = ((info.ticket as any).groupId as any)?._id || (info.ticket as any).groupId || "";
                     const isAccompanying = Boolean(
                         (accPersonGroupId && tGroupIdStr === accPersonGroupId) ||
-                        ticket.name?.toLowerCase().includes('accompany') ||
+                        info.ticket.name?.toLowerCase().includes('accompany') ||
                         !a.isPrimary
                     );
 
                     result.push({
-                        name: finalName,
+                        name: info.finalName,
                         quantity: 1,
-                        price: finalPrice,
-                        originalId: ticket.id || (ticket as any)._id,
-                        groupId: (ticket as any).groupId,
+                        price: info.finalPrice,
+                        originalId: info.ticket.id || (info.ticket as any)._id,
+                        groupId: (info.ticket as any).groupId,
                         isAccompanying
                     });
                 }
             }
         });
         return result;
-    }, [attendees, tickets]);
+    }, [attendees, tickets, getTicketInfoForAttendee]);
 
     const totalAmount = processedTickets.length > 0 
         ? processedTickets.reduce((sum, t) => sum + (t.price * t.quantity), 0)
@@ -265,7 +308,9 @@ const CheckoutClient = () => {
             // Validate inputs
             const invalidIds = attendees.filter(a => {
                 if (!a.name || a.name.trim() === '') return true;
-                if (a.isPrimary === false) {
+                if (a.isPrimary !== false) {
+                    if (!a.date_of_birth || a.date_of_birth.trim() === '') return true;
+                } else {
                     if (!a.age || a.age.trim() === '') return true;
                     if (!a.relation || a.relation.trim() === '') return true;
                 }
@@ -273,17 +318,28 @@ const CheckoutClient = () => {
             }).map(a => a.id);
             if (invalidIds.length > 0) {
                 setInvalidAttendeeIds(invalidIds);
-                const firstInvalid = document.getElementById(`attendee-name-${invalidIds[0]}`);
-                if (firstInvalid) firstInvalid.focus();
+                toast.error("Please fill in all required fields for all attendees.");
+                const firstInvalid = attendees.find(a => a.id === invalidIds[0]);
+                if (firstInvalid) {
+                    if (!firstInvalid.name || firstInvalid.name.trim() === '') {
+                        document.getElementById(`attendee-name-${firstInvalid.id}`)?.focus();
+                    } else if (firstInvalid.isPrimary !== false && (!firstInvalid.date_of_birth || firstInvalid.date_of_birth.trim() === '')) {
+                        document.getElementById(`attendee-dob-${firstInvalid.id}`)?.focus();
+                    } else if (firstInvalid.isPrimary === false && (!firstInvalid.age || firstInvalid.age.trim() === '')) {
+                        document.getElementById(`attendee-age-${firstInvalid.id}`)?.focus();
+                    } else if (firstInvalid.isPrimary === false && (!firstInvalid.relation || firstInvalid.relation.trim() === '')) {
+                        document.getElementById(`attendee-relation-${firstInvalid.id}`)?.focus();
+                    }
+                }
                 return;
             }
 
             setIsProcessing(true);
             const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api";
             
-            // 1. Fetch Keys and Logo from Settings
-            const rzpKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID ?? "";
-            const rzpKeySecret = process.env.NEXT_PUBLIC_RAZORPAY_KEY_SECRET ?? "";
+            // 1. Fetch Keys and Logo
+            const rzpKeyId = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID || "rzp_test_15hVimydMvqPca";
+            const rzpKeySecret = process.env.NEXT_PUBLIC_RAZORPAY_KEY_SECRET || "QnAvVHAkqSXG5attnabksu07";
 
             let appLogo = setting('general.logo', '/logo.png');
            
@@ -314,29 +370,32 @@ const CheckoutClient = () => {
                             price: t.price,
                             quantity: t.quantity,
                             attendees: attendees.filter(a => {
-                                const ageNum = parseInt(a.age);
-                                const isUnderAge = !a.isPrimary && !isNaN(ageNum) && ageNum <= underAgeLimit;
-                                const finalName = isUnderAge ? `${a.ticketName} (Under ${underAgeLimit})` : a.ticketName;
-                                return finalName === t.name;
-                            }).map(a => ({ name: a.name, age: a.age, relation: a.relation }))
+                                const info = getTicketInfoForAttendee(a);
+                                return info.finalName === t.name && info.finalPrice === t.price;
+                            }).map(a => ({ 
+                                name: a.name, 
+                                age: a.age, 
+                                date_of_birth: a.date_of_birth, 
+                                relation: a.relation 
+                            }))
                         })),
                         totalAmount,
                         paymentMethod: paymentMethodStr
                     };
 
                     const attendeesData = attendees.map(a => {
-                        const ageNum = parseInt(a.age);
-                        const isUnderAgeLimit = !a.isPrimary && !isNaN(ageNum) && ageNum <= underAgeLimit;
-                        const ticket = tickets.find(t => t.name === a.ticketName);
+                        const info = getTicketInfoForAttendee(a);
                         return {
                             eventId: checkoutData?.event?.id,
                             name: a.name,
                             age: a.age,
+                            date_of_birth: a.date_of_birth,
                             relation: a.relation,
-                            ticketName: isUnderAgeLimit ? `${a.ticketName} (Under ${underAgeLimit})` : a.ticketName,
-                            ticketId: ticket?._id || ticket?.id,
-                            ticketPrice: isUnderAgeLimit ? 0 : (ticket?.price || 0),
-                            ticketStatus: "Unused"
+                            ticketName: info.finalName,
+                            ticketId: info.ticket?._id || info.ticket?.id,
+                            ticketPrice: info.finalPrice,
+                            ticketStatus: "Unused",
+                            isPrimary: a.isPrimary !== false
                         };
                     });
 
@@ -405,39 +464,14 @@ const CheckoutClient = () => {
 
             if (totalAmount === 0) {
                 try {
-                    const freeOrderId = `ref_${Date.now()}`;
-                    const freePaymentId = `ref_${Date.now()}`;
-                    const message = `${freeOrderId}|${freePaymentId}`;
-                    
-                    const encoder = new TextEncoder();
-                    const keyData = encoder.encode(rzpKeySecret);
-                    const msgData = encoder.encode(message);
-
-                    const cryptoKey = await window.crypto.subtle.importKey(
-                        'raw',
-                        keyData,
-                        { name: 'HMAC', hash: 'SHA-256' },
-                        false,
-                        ['sign']
-                    );
-
-                    const signatureBuffer = await window.crypto.subtle.sign(
-                        'HMAC',
-                        cryptoKey,
-                        msgData
-                    );
-
-                    const signature = Array.from(new Uint8Array(signatureBuffer))
-                        .map(b => b.toString(16).padStart(2, '0'))
-                        .join('');
-
+                    const freePaymentId = `free_${Date.now()}`;
                     await processBooking({
-                        razorpay_order_id: freeOrderId,
+                        razorpay_order_id: null,
                         razorpay_payment_id: freePaymentId,
-                        razorpay_signature: signature
+                        razorpay_signature: null
                     });
                 } catch (e) {
-                    console.error("Failed to generate free booking signature", e);
+                    console.error("Failed to process free booking", e);
                     toast.error("Error processing free booking.");
                     setIsProcessing(false);
                 }

@@ -56,6 +56,55 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
       `${frontendUrl}/admin/attendees/scanner?eventId=${eventDetails?.id || eventDetails?._id || ''}&attendeeId=${attendee?.id || attendee?._id || 'temp'}&ticketId=${tId}`
   )}`;
 
+  const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+  const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
+  let ageNum = parseInt(attendee?.age);
+  if (isNaN(ageNum) && attendee?.date_of_birth) {
+    const dobParts = String(attendee.date_of_birth).split('-');
+    if (dobParts.length >= 3) {
+      const bYear = parseInt(dobParts[0], 10);
+      const bMonth = parseInt(dobParts[1], 10);
+      const bDay = parseInt(dobParts[2], 10);
+      if (!isNaN(bYear)) {
+        const today = new Date();
+        let calcAge = today.getFullYear() - bYear;
+        const curM = today.getMonth() + 1;
+        const curD = today.getDate();
+        if (curM < bMonth || (curM === bMonth && curD < bDay)) calcAge--;
+        if (calcAge >= 0) ageNum = calcAge;
+      }
+    }
+  }
+
+  const isAccompanying = Boolean(
+    attendee?.relation ||
+    attendee?.ticketName?.toLowerCase().includes('accompany') ||
+    attendee?.isPrimary === false
+  );
+  const isUnderAge = isAccompanying && !isNaN(ageNum) && ageNum <= underAgeLimit;
+  const isAboveAge = !isAccompanying && !isNaN(ageNum) && ageNum >= agedAboveLimit;
+  const shouldShowAgeInType = isUnderAge || isAboveAge;
+
+  const cleanBase = (attendee?.ticketName || '').replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
+  const effectiveAge = attendee?.age || (!isNaN(ageNum) ? String(ageNum) : '');
+  const displayTicketType = shouldShowAgeInType && effectiveAge
+    ? `${cleanBase} (Aged ${effectiveAge})`
+    : cleanBase;
+  const isFree = attendee?.ticketPrice == 0 || !attendee?.ticketPrice || shouldShowAgeInType;
+
+  let dobFormatted = 'N/A';
+  if (attendee?.date_of_birth) {
+    const parts = String(attendee.date_of_birth).split('-');
+    if (parts.length === 3) {
+      dobFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`; // DD-MM-YYYY
+    } else {
+      dobFormatted = String(attendee.date_of_birth);
+    }
+  } else if (isAboveAge && !isNaN(ageNum)) {
+    const approxYear = new Date().getFullYear() - ageNum;
+    dobFormatted = `01-01-${approxYear}`;
+  }
+
   return (
     <div 
       ref={ref} 
@@ -87,7 +136,7 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
             </div>
             <div className="detail-item">
               <span className="detail-label">TYPE :</span>
-              <span className="detail-value">{attendee.ticketName || ''}</span>
+              <span className="detail-value">{displayTicketType || attendee.ticketName || ''}</span>
             </div>
             <div className="detail-item">
               <span className="detail-label">PAYMENT STATUS :</span>
@@ -105,27 +154,35 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
             </div>
             <div className="detail-item">
               <span className="detail-label">PRICE :</span>
-              <span className="detail-value">{attendee.ticketPrice == 0 || !attendee.ticketPrice ? "FREE" : `₹ ${attendee.ticketPrice}`}</span>
+              <span className="detail-value">{isFree ? "FREE" : `₹ ${attendee.ticketPrice}`}</span>
             </div>
             <div className="detail-item">
               <span className="detail-label">STATUS :</span>
               <span className="detail-value">{attendee.ticketStatus || ''}</span>
             </div>
-            {(attendee.age || attendee.relation) ? (
+            {isAboveAge ? (
+              <div className="detail-item">
+                <span className="detail-label">DATE OF BIRTH :</span>
+                <span className="detail-value">{dobFormatted}</span>
+              </div>
+            ) : isUnderAge && effectiveAge ? (
               <>
-                {attendee.age && (
-                  <div className="detail-item">
-                    <span className="detail-label">AGE :</span>
-                    <span className="detail-value">{attendee.age}</span>
-                  </div>
-                )}
-                {attendee.relation && (
+                <div className="detail-item">
+                  <span className="detail-label">AGE :</span>
+                  <span className="detail-value">{effectiveAge}</span>
+                </div>
+                {attendee?.relation && (
                   <div className="detail-item">
                     <span className="detail-label">RELATION :</span>
                     <span className="detail-value">{attendee.relation}</span>
                   </div>
                 )}
               </>
+            ) : attendee?.relation ? (
+              <div className="detail-item">
+                <span className="detail-label">RELATION :</span>
+                <span className="detail-value">{attendee.relation}</span>
+              </div>
             ) : (
               <div className="detail-item" style={{ visibility: 'hidden' }}>
                 <span className="detail-label">-</span>

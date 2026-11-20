@@ -127,6 +127,9 @@ const Booking = () => {
 
         return {
           ...a,
+          date_of_birth: a.date_of_birth || matched?.date_of_birth,
+          age: a.age || matched?.age,
+          relation: a.relation || matched?.relation,
           ticketStatus,
           status: ticketStatus,
           attendeeRecordId: matched?._id || a._id,

@@ -1,11 +1,20 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 
+export interface BookingAttendee {
+  _id?: string;
+  name: string;
+  age?: string;
+  date_of_birth?: string;
+  relation?: string;
+  ticketStatus?: string;
+}
+
 export interface BookingTicket {
   ticketId: string;
   ticketName?: string;
   price: number;
   quantity: number;
-  attendees: { name: string }[];
+  attendees: BookingAttendee[];
 }
 
 export interface Booking {

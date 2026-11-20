@@ -42,6 +42,76 @@ const BookingWizard = () => {
   
   const { setting } = useSettingsContext();
   const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+  const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
+  const todayStr = dayjs().format("YYYY-MM-DD");
+
+  const calculateAgeFromDob = (dobString: string): string => {
+    if (!dobString) return "";
+    const parts = dobString.split("-");
+    let birthYear = NaN, birthMonth = NaN, birthDay = NaN;
+    if (parts.length >= 3) {
+      birthYear = parseInt(parts[0], 10);
+      birthMonth = parseInt(parts[1], 10);
+      birthDay = parseInt(parts[2], 10);
+    }
+    if (isNaN(birthYear) || isNaN(birthMonth) || isNaN(birthDay)) {
+      const dob = new Date(dobString);
+      if (isNaN(dob.getTime())) return "";
+      birthYear = dob.getFullYear();
+      birthMonth = dob.getMonth() + 1;
+      birthDay = dob.getDate();
+    }
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth() + 1;
+    const currentDay = today.getDate();
+
+    let age = currentYear - birthYear;
+    if (currentMonth < birthMonth || (currentMonth === birthMonth && currentDay < birthDay)) {
+      age--;
+    }
+    return age >= 0 ? String(age) : "0";
+  };
+
+  const isAccompanyingTicket = (ticket: any) => {
+    if (!ticket) return false;
+    const ticketGroupId = typeof ticket.groupId === 'object' && ticket.groupId !== null
+      ? (ticket.groupId as any)._id
+      : ticket.groupId;
+    const accPersonGroupId = process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID;
+    const isAccName = (ticket.ticketName || ticket.name || '').toLowerCase().includes('accompany');
+    return Boolean(
+      (accPersonGroupId && ticketGroupId && ticketGroupId === accPersonGroupId) ||
+      isAccName ||
+      ticket.isAccompanying
+    );
+  };
+
+  const getTicketInfoForAttendeeItem = (ticket: any, att: any) => {
+    const rawName = ticket?.ticketName || ticket?.name || 'Event Ticket';
+    const cleanBase = rawName.replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
+    const isAcc = isAccompanyingTicket(ticket);
+    const ageNum = parseInt(att?.age);
+
+    const isUnderAge = isAcc && !isNaN(ageNum) && ageNum <= underAgeLimit;
+    const isAboveAge = !isAcc && !isNaN(ageNum) && ageNum >= agedAboveLimit;
+    const shouldShowAge = isUnderAge || isAboveAge;
+
+    const finalPrice = shouldShowAge ? 0 : (ticket?.ticketPrice || 0);
+    const finalName = shouldShowAge && att?.age ? `${cleanBase} (Aged ${att.age})` : cleanBase;
+
+    return {
+      ticket,
+      cleanBase,
+      isAcc,
+      ageNum,
+      isUnderAge,
+      isAboveAge,
+      shouldShowAge,
+      finalPrice,
+      finalName
+    };
+  };
   
 
   const [step, setStep] = useState(1);
@@ -104,12 +174,20 @@ const BookingWizard = () => {
           });
 
           const initSelections: { [key: string]: number } = {};
-          const initAttendees: { [key: string]: { name: string }[] } = {};
+          const initAttendees: { [key: string]: { name: string; age?: string; date_of_birth?: string; relation?: string }[] } = {};
           
           booking.tickets?.forEach((t: any) => {
             const tId = t.ticketId?._id || t.ticketId;
-            initSelections[tId] = t.quantity;
-            initAttendees[tId] = t.attendees || Array.from({ length: t.quantity }).map(() => ({ name: "", age: "", relation: "" }));
+            initSelections[tId] = (initSelections[tId] || 0) + (t.quantity || 1);
+            const mappedAtts = (t.attendees && t.attendees.length > 0)
+              ? t.attendees.map((att: any) => ({
+                  name: att.name || "",
+                  age: att.age || "",
+                  date_of_birth: att.date_of_birth || "",
+                  relation: att.relation || ""
+                }))
+              : Array.from({ length: t.quantity || 1 }).map(() => ({ name: "", age: "", date_of_birth: "", relation: "" }));
+            initAttendees[tId] = [...(initAttendees[tId] || []), ...mappedAtts];
           });
           
           setTicketSelections(initSelections);
@@ -538,14 +616,26 @@ const BookingWizard = () => {
     }
     
     // Initialize attendees array for Step 2 based on quantity
+    let userAssigned = false;
     const newAttendees: any = { ...attendees };
     Object.keys(ticketSelections).forEach(ticketId => {
       const qty = ticketSelections[ticketId];
+      if (qty <= 0) return;
+      const ticket = activeTickets.find(t => t.id === ticketId || t._id === ticketId) || tickets.find(t => t._id === ticketId || t.id === ticketId);
+      const isAcc = isAccompanyingTicket(ticket);
+
       if (!newAttendees[ticketId]) {
-        newAttendees[ticketId] = Array.from({ length: qty }).map(() => ({ name: "", age: "", relation: "" }));
+        newAttendees[ticketId] = Array.from({ length: qty }).map((_, i) => {
+          let prefillName = "";
+          if (!isAcc && !userAssigned && i === 0 && selectedUser?.name) {
+            prefillName = selectedUser.name;
+            userAssigned = true;
+          }
+          return { name: prefillName, age: "", date_of_birth: "", relation: "" };
+        });
       } else if (newAttendees[ticketId].length !== qty) {
         const existing = newAttendees[ticketId];
-        const updated = Array.from({ length: qty }).map((_, i) => existing[i] || { name: "", age: "", relation: "" });
+        const updated = Array.from({ length: qty }).map((_, i) => existing[i] || { name: "", age: "", date_of_birth: "", relation: "" });
         newAttendees[ticketId] = updated;
       }
     });
@@ -556,8 +646,16 @@ const BookingWizard = () => {
 
   const handleAttendeeChange = (ticketId: string, index: number, field: string, value: string) => {
     setAttendees(prev => {
-      const updated = [...prev[ticketId]];
-      updated[index] = { ...updated[index], [field]: value };
+      const updated = [...(prev[ticketId] || [])];
+      const currentItem = { ...(updated[index] || { name: "", age: "", date_of_birth: "", relation: "" }) };
+      if (field === 'date_of_birth') {
+        const computedAge = calculateAgeFromDob(value);
+        currentItem.date_of_birth = value;
+        currentItem.age = computedAge;
+      } else {
+        currentItem[field] = value;
+      }
+      updated[index] = currentItem;
       return { ...prev, [ticketId]: updated };
     });
   };
@@ -565,23 +663,13 @@ const BookingWizard = () => {
   const calculateSubtotal = (ticketId: string) => {
     const qty = ticketSelections[ticketId] || 0;
     const ticket = tickets.find(t => t._id === ticketId || t.id === ticketId);
-    if (!ticket) return 0;
+    if (!ticket || qty <= 0) return 0;
     
-    const ticketGroupId = typeof ticket?.groupId === 'object' && ticket?.groupId !== null
-        ? (ticket?.groupId as any)._id
-        : ticket?.groupId;
-    const isAccompanyingPerson = ticketGroupId === process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID;
-
     let total = 0;
     for (let i = 0; i < qty; i++) {
-        const attendee = attendees[ticketId]?.[i];
-        if (isAccompanyingPerson && attendee && attendee.age) {
-            const ageNum = parseInt(attendee.age);
-            if (!isNaN(ageNum) && ageNum < underAgeLimit) {
-                continue;
-            }
-        }
-        total += ticket.ticketPrice || 0;
+      const attendee = attendees[ticketId]?.[i];
+      const info = getTicketInfoForAttendeeItem(ticket, attendee);
+      total += info.finalPrice;
     }
     return total;
   };
@@ -606,32 +694,36 @@ const BookingWizard = () => {
     
     Object.keys(ticketSelections).forEach(ticketId => {
       if (ticketSelections[ticketId] > 0) {
-        const ticket = activeTickets.find(t => t.id === ticketId || t._id === ticketId);
-        const ticketGroupId = typeof ticket?.groupId === 'object' && ticket?.groupId !== null
-            ? (ticket?.groupId as any)._id
-            : ticket?.groupId;
-        const isAccompanyingPerson = ticketGroupId === process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID || !ticketGroupId || ticket?.ticketName?.toLowerCase().includes('accompany');
+        const ticket = activeTickets.find(t => t.id === ticketId || t._id === ticketId) || tickets.find(t => t._id === ticketId || t.id === ticketId);
+        const isAcc = isAccompanyingTicket(ticket);
             
         attendees[ticketId]?.forEach((att, idx) => {
           if (!newErrors[ticketId]) newErrors[ticketId] = {};
           if (!newErrors[ticketId][idx]) newErrors[ticketId][idx] = {};
           
           if (!att.name || !att.name.trim()) {
-              allValid = false;
-              newErrors[ticketId][idx].name = "Name is required";
-              if (!firstErrorFieldId) firstErrorFieldId = `name-${ticketId}-${idx}`;
+            allValid = false;
+            newErrors[ticketId][idx].name = "Name is required";
+            if (!firstErrorFieldId) firstErrorFieldId = `name-${ticketId}-${idx}`;
           }
-          if (isAccompanyingPerson) {
-              if (!att.age || !att.age.toString().trim()) {
-                  allValid = false;
-                  newErrors[ticketId][idx].age = "Age is required";
-                  if (!firstErrorFieldId) firstErrorFieldId = `age-${ticketId}-${idx}`;
-              }
-              if (!att.relation || !att.relation.trim()) {
-                  allValid = false;
-                  newErrors[ticketId][idx].relation = "Relation is required";
-                  if (!firstErrorFieldId) firstErrorFieldId = `relation-${ticketId}-${idx}`;
-              }
+
+          if (isAcc) {
+            if (!att.age || !att.age.toString().trim()) {
+              allValid = false;
+              newErrors[ticketId][idx].age = "Age is required";
+              if (!firstErrorFieldId) firstErrorFieldId = `age-${ticketId}-${idx}`;
+            }
+            if (!att.relation || !att.relation.trim()) {
+              allValid = false;
+              newErrors[ticketId][idx].relation = "Relation is required";
+              if (!firstErrorFieldId) firstErrorFieldId = `relation-${ticketId}-${idx}`;
+            }
+          } else {
+            if (!att.date_of_birth || !att.date_of_birth.trim()) {
+              allValid = false;
+              newErrors[ticketId][idx].date_of_birth = "Date of Birth is required";
+              if (!firstErrorFieldId) firstErrorFieldId = `dob-${ticketId}-${idx}`;
+            }
           }
         });
       }
@@ -641,10 +733,10 @@ const BookingWizard = () => {
 
     if (!allValid) {
       if (firstErrorFieldId) {
-          setTimeout(() => {
-              const el = document.getElementById(firstErrorFieldId);
-              if (el) el.focus();
-          }, 100);
+        setTimeout(() => {
+          const el = document.getElementById(firstErrorFieldId);
+          if (el) el.focus();
+        }, 100);
       }
       return;
     }
@@ -664,54 +756,50 @@ const BookingWizard = () => {
     const payloadTickets = Object.keys(ticketSelections)
       .filter(id => ticketSelections[id] > 0)
       .flatMap(id => {
-        const ticket = tickets.find(t => t._id === id);
+        const ticket = tickets.find(t => t._id === id || t.id === id);
         if (!ticket) return [];
         
-        const ticketGroupId = typeof ticket?.groupId === 'object' && ticket?.groupId !== null
-            ? (ticket?.groupId as any)._id
-            : ticket?.groupId;
-        const isAccompanyingPerson = ticketGroupId === process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID;
-        
-        const regularAttendees: any[] = [];
-        const underAgeAttendees: any[] = [];
-        
+        const qty = ticketSelections[id];
         const attList = attendees[id] || [];
-        for (let i = 0; i < ticketSelections[id]; i++) {
-            const attendee = attList[i];
-            if (isAccompanyingPerson && attendee && attendee.age) {
-                const ageNum = parseInt(attendee.age);
-                if (!isNaN(ageNum) && ageNum < underAgeLimit) {
-                    underAgeAttendees.push(attendee);
-                    continue;
-                }
-            }
-            regularAttendees.push(attendee);
+
+        // Group attendees by finalName and finalPrice
+        const groupsMap: { [key: string]: { name: string; price: number; attendees: any[] } } = {};
+
+        for (let i = 0; i < qty; i++) {
+          const attendee = attList[i] || { name: "" };
+          const info = getTicketInfoForAttendeeItem(ticket, attendee);
+          const key = `${info.finalName}_${info.finalPrice}`;
+
+          if (!groupsMap[key]) {
+            groupsMap[key] = {
+              name: info.finalName,
+              price: info.finalPrice,
+              attendees: []
+            };
+          }
+
+          groupsMap[key].attendees.push({
+            name: attendee.name,
+            age: attendee.age || (info.ageNum ? String(info.ageNum) : ""),
+            date_of_birth: attendee.date_of_birth || "",
+            relation: attendee.relation || ""
+          });
         }
-        
-        const results = [];
-        if (regularAttendees.length > 0) {
-            results.push({
-                ticketId: id,
-                ticketName: ticket?.ticketName,
-                price: ticket?.ticketPrice || 0,
-                quantity: regularAttendees.length,
-                attendees: regularAttendees
-            });
-        }
-        if (underAgeAttendees.length > 0) {
-            results.push({
-                ticketId: id,
-                ticketName: `For ${ticket?.ticketName} (Under ${underAgeLimit})`,
-                price: 0,
-                quantity: underAgeAttendees.length,
-                attendees: underAgeAttendees
-            });
-        }
-        return results;
+
+        return Object.values(groupsMap).map(grp => ({
+          ticketId: id,
+          ticketName: grp.name,
+          price: grp.price,
+          quantity: grp.attendees.length,
+          attendees: grp.attendees
+        }));
       });
 
     const finalTransactionRef = transactionNumber.trim() ? transactionNumber : `REF-${Date.now()}`;
     const totalAmount = calculateTotal();
+    const isFree = totalAmount === 0;
+    const finalPaymentStatus = isFree ? "Free" : "Completed";
+    const finalPaymentMethod = isFree ? "Free" : paymentMode;
 
     const payload = {
       eventId: selectedEventId,
@@ -723,14 +811,14 @@ const BookingWizard = () => {
         phone: billingInfo.phone
       },
       tickets: payloadTickets,
-      paymentMethod: paymentMode,
+      paymentMethod: finalPaymentMethod,
       transactionRef: finalTransactionRef,
       totalAmount: totalAmount,
-      paymentStatus: totalAmount === 0 ? "Completed" : "Completed",
+      paymentStatus: finalPaymentStatus,
       bookingStatus: "Confirmed",
       transactionData: {
         description: `Admin Booking for ${selectedEvent?.title || 'Event'}`,
-        paymentMethod: paymentMode,
+        paymentMethod: finalPaymentMethod,
         amount: totalAmount,
         userId: selectedUserId,
         eventId: selectedEventId,
@@ -782,7 +870,15 @@ const BookingWizard = () => {
           }).map((a: any) => {
             const match = payloadTickets.find(pt => pt.attendees.some((pa: any) => pa.name === a.name));
             if (match) {
-              return { ...a, ticketName: match.ticketName, ticketPrice: match.price };
+              const matchedAtt = match.attendees.find((pa: any) => pa.name === a.name);
+              return { 
+                ...a, 
+                ticketName: match.ticketName, 
+                ticketPrice: match.price,
+                date_of_birth: a.date_of_birth || matchedAtt?.date_of_birth,
+                age: a.age || matchedAtt?.age,
+                relation: a.relation || matchedAtt?.relation
+              };
             }
             return a;
           });
@@ -1085,77 +1181,128 @@ const BookingWizard = () => {
                   {Object.keys(ticketSelections).map(ticketId => {
                     const qty = ticketSelections[ticketId];
                     if (qty <= 0) return null;
-                    const ticket = tickets.find(t => t._id === ticketId);
-                    
-                    const ticketGroupId = typeof ticket?.groupId === 'object' && ticket?.groupId !== null
-                        ? (ticket?.groupId as any)._id
-                        : ticket?.groupId;
-                    const isAccompanyingPerson = ticketGroupId === process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID || !ticketGroupId || ticket?.ticketName?.toLowerCase().includes('accompany');
+                    const ticket = tickets.find(t => t._id === ticketId || t.id === ticketId);
+                    const isAccompanyingPerson = isAccompanyingTicket(ticket);
 
-                    return Array.from({ length: qty }).map((_, idx) => (
-                      <div key={`${ticketId}-${idx}`} className="mb-4 p-3 border rounded">
-                        <Form.Label className="fw-medium text-dark mb-3">
-                          Attendee {idx + 1} ({ticket?.ticketName})
-                        </Form.Label>
-                        <Row>
-                          <Col md={isAccompanyingPerson ? 6 : 12} className="mb-3">
-                            <Form.Label className="text-danger small">* <span className="text-dark">Name</span></Form.Label>
-                            <Form.Control 
-                              id={`name-${ticketId}-${idx}`}
-                              placeholder="Enter Name" 
-                              value={attendees[ticketId]?.[idx]?.name || ""}
-                              onChange={e => {
-                                handleAttendeeChange(ticketId, idx, 'name', e.target.value);
-                                if (attendeeErrors[ticketId]?.[idx]?.name) {
-                                    setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], name: undefined } } }));
-                                }
-                              }}
-                              isInvalid={!!attendeeErrors[ticketId]?.[idx]?.name}
-                            />
-                            {attendeeErrors[ticketId]?.[idx]?.name && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].name}</div>}
-                          </Col>
-                          
-                          {isAccompanyingPerson && (
+                    return Array.from({ length: qty }).map((_, idx) => {
+                      const att = attendees[ticketId]?.[idx];
+                      const info = getTicketInfoForAttendeeItem(ticket, att);
+                      const displayTitle = info.shouldShowAge && att?.age
+                        ? `${info.cleanBase} (Aged ${att.age})`
+                        : info.cleanBase;
+
+                      return (
+                        <div key={`${ticketId}-${idx}`} className="mb-4 p-3 border rounded">
+                          <div className="d-flex justify-content-between align-items-center mb-3">
+                            <Form.Label className="fw-medium text-dark mb-0">
+                              Attendee {idx + 1} ({displayTitle})
+                            </Form.Label>
+                            {info.shouldShowAge && (
+                              <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fs-12">
+                                Free Pass
+                              </span>
+                            )}
+                          </div>
+                          <Row>
+                            {!isAccompanyingPerson ? (
                               <>
-                                  <Col md={2} className="mb-3">
-                                      <Form.Label className="text-danger small">* <span className="text-dark">Age</span></Form.Label>
-                                      <Form.Control 
-                                        id={`age-${ticketId}-${idx}`}
-                                        type="number"
-                                        min="1"
-                                        placeholder="Age" 
-                                        value={attendees[ticketId]?.[idx]?.age || ""}
-                                        onChange={e => {
-                                            handleAttendeeChange(ticketId, idx, 'age', e.target.value);
-                                            if (attendeeErrors[ticketId]?.[idx]?.age) {
-                                                setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], age: undefined } } }));
-                                            }
-                                        }}
-                                        isInvalid={!!attendeeErrors[ticketId]?.[idx]?.age}
-                                      />
-                                      {attendeeErrors[ticketId]?.[idx]?.age && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].age}</div>}
-                                  </Col>
-                                  <Col md={4} className="mb-3">
-                                      <Form.Label className="text-danger small">* <span className="text-dark">Relation</span></Form.Label>
-                                      <Form.Control 
-                                        id={`relation-${ticketId}-${idx}`}
-                                        placeholder="e.g. Spouse, Child" 
-                                        value={attendees[ticketId]?.[idx]?.relation || ""}
-                                        onChange={e => {
-                                            handleAttendeeChange(ticketId, idx, 'relation', e.target.value);
-                                            if (attendeeErrors[ticketId]?.[idx]?.relation) {
-                                                setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], relation: undefined } } }));
-                                            }
-                                        }}
-                                        isInvalid={!!attendeeErrors[ticketId]?.[idx]?.relation}
-                                      />
-                                      {attendeeErrors[ticketId]?.[idx]?.relation && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].relation}</div>}
-                                  </Col>
+                                <Col md={7} className="mb-3">
+                                  <Form.Label className="text-danger small">* <span className="text-dark">Full Name</span></Form.Label>
+                                  <Form.Control 
+                                    id={`name-${ticketId}-${idx}`}
+                                    placeholder="Enter Full Name" 
+                                    value={attendees[ticketId]?.[idx]?.name || ""}
+                                    onChange={e => {
+                                      handleAttendeeChange(ticketId, idx, 'name', e.target.value);
+                                      if (attendeeErrors[ticketId]?.[idx]?.name) {
+                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], name: undefined } } }));
+                                      }
+                                    }}
+                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.name}
+                                  />
+                                  {attendeeErrors[ticketId]?.[idx]?.name && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].name}</div>}
+                                </Col>
+                                <Col md={5} className="mb-3">
+                                  <Form.Label className="text-danger small">* <span className="text-dark">Date of Birth</span></Form.Label>
+                                  <Form.Control 
+                                    id={`dob-${ticketId}-${idx}`}
+                                    type="date"
+                                    max={todayStr}
+                                    value={attendees[ticketId]?.[idx]?.date_of_birth || ""}
+                                    onChange={e => {
+                                      handleAttendeeChange(ticketId, idx, 'date_of_birth', e.target.value);
+                                      if (attendeeErrors[ticketId]?.[idx]?.date_of_birth) {
+                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], date_of_birth: undefined } } }));
+                                      }
+                                    }}
+                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.date_of_birth}
+                                  />
+                                  {attendeeErrors[ticketId]?.[idx]?.date_of_birth && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].date_of_birth}</div>}
+                                  {attendees[ticketId]?.[idx]?.age && (
+                                    <div className="text-muted small mt-1">
+                                      Calculated Age: <span className="fw-semibold">{attendees[ticketId][idx].age}</span>
+                                    </div>
+                                  )}
+                                </Col>
                               </>
-                          )}
-                        </Row>
-                      </div>
-                    ));
+                            ) : (
+                              <>
+                                <Col md={5} className="mb-3">
+                                  <Form.Label className="text-danger small">* <span className="text-dark">Full Name</span></Form.Label>
+                                  <Form.Control 
+                                    id={`name-${ticketId}-${idx}`}
+                                    placeholder="Enter Full Name" 
+                                    value={attendees[ticketId]?.[idx]?.name || ""}
+                                    onChange={e => {
+                                      handleAttendeeChange(ticketId, idx, 'name', e.target.value);
+                                      if (attendeeErrors[ticketId]?.[idx]?.name) {
+                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], name: undefined } } }));
+                                      }
+                                    }}
+                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.name}
+                                  />
+                                  {attendeeErrors[ticketId]?.[idx]?.name && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].name}</div>}
+                                </Col>
+                                <Col md={3} className="mb-3">
+                                  <Form.Label className="text-danger small">* <span className="text-dark">Age</span></Form.Label>
+                                  <Form.Control 
+                                    id={`age-${ticketId}-${idx}`}
+                                    type="number"
+                                    min="1"
+                                    placeholder="Age" 
+                                    value={attendees[ticketId]?.[idx]?.age || ""}
+                                    onChange={e => {
+                                      handleAttendeeChange(ticketId, idx, 'age', e.target.value);
+                                      if (attendeeErrors[ticketId]?.[idx]?.age) {
+                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], age: undefined } } }));
+                                      }
+                                    }}
+                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.age}
+                                  />
+                                  {attendeeErrors[ticketId]?.[idx]?.age && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].age}</div>}
+                                </Col>
+                                <Col md={4} className="mb-3">
+                                  <Form.Label className="text-danger small">* <span className="text-dark">Relation</span></Form.Label>
+                                  <Form.Control 
+                                    id={`relation-${ticketId}-${idx}`}
+                                    placeholder="e.g. Spouse, Child" 
+                                    value={attendees[ticketId]?.[idx]?.relation || ""}
+                                    onChange={e => {
+                                      handleAttendeeChange(ticketId, idx, 'relation', e.target.value);
+                                      if (attendeeErrors[ticketId]?.[idx]?.relation) {
+                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], relation: undefined } } }));
+                                      }
+                                    }}
+                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.relation}
+                                  />
+                                  {attendeeErrors[ticketId]?.[idx]?.relation && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].relation}</div>}
+                                </Col>
+                              </>
+                            )}
+                          </Row>
+                        </div>
+                      );
+                    });
                   })}
                 </Col>
                 
@@ -1190,55 +1337,31 @@ const BookingWizard = () => {
                       {Object.keys(ticketSelections).flatMap(ticketId => {
                         const qty = ticketSelections[ticketId];
                         if (qty <= 0) return [];
-                        const ticket = tickets.find(t => t._id === ticketId);
-                        
-                        const ticketGroupId = typeof ticket?.groupId === 'object' && ticket?.groupId !== null
-                            ? (ticket?.groupId as any)._id
-                            : ticket?.groupId;
-                        const isAccompanyingPerson = ticketGroupId === process.env.NEXT_PUBLIC_ACCOMPANYING_PERSON_GROUP_ID;
-                        
-                        let regularQty = 0;
-                        let underAgeQty = 0;
-                        
-                        const attList = attendees[ticketId] || [];
+                        const ticket = tickets.find(t => t._id === ticketId || t.id === ticketId);
+                        if (!ticket) return [];
+
+                        const grouped: { [key: string]: { name: string; price: number; quantity: number } } = {};
                         for (let i = 0; i < qty; i++) {
-                            const attendee = attList[i];
-                            if (isAccompanyingPerson && attendee && attendee.age) {
-                                const ageNum = parseInt(attendee.age);
-                                if (!isNaN(ageNum) && ageNum < underAgeLimit) {
-                                    underAgeQty++;
-                                    continue;
-                                }
-                            }
-                            regularQty++;
+                          const attendee = attendees[ticketId]?.[i];
+                          const info = getTicketInfoForAttendeeItem(ticket, attendee);
+                          const key = `${info.finalName}_${info.finalPrice}`;
+                          if (!grouped[key]) {
+                            grouped[key] = { name: info.finalName, price: info.finalPrice, quantity: 0 };
+                          }
+                          grouped[key].quantity += 1;
                         }
 
-                        const items = [];
-                        if (regularQty > 0) {
-                          items.push(
-                            <div key={`summary-${ticketId}-regular`} className="mb-3 text-muted small">
-                              <div className="d-flex justify-content-between mb-1">
-                                <span>{ticket?.ticketName}</span>
-                              </div>
-                              <div className="d-flex justify-content-between">
-                                <span>₹{(ticket?.ticketPrice || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })} X {regularQty}</span>
-                              </div>
+                        return Object.values(grouped).map((item, gIdx) => (
+                          <div key={`summary-${ticketId}-${gIdx}`} className="mb-3 text-muted small">
+                            <div className="d-flex justify-content-between mb-1">
+                              <span>{item.name}</span>
                             </div>
-                          );
-                        }
-                        if (underAgeQty > 0) {
-                          items.push(
-                            <div key={`summary-${ticketId}-underage`} className="mb-3 text-muted small">
-                              <div className="d-flex justify-content-between mb-1">
-                                <span>For {ticket?.ticketName} (Under {underAgeLimit})</span>
-                              </div>
-                              <div className="d-flex justify-content-between">
-                                <span>₹0.00 X {underAgeQty}</span>
-                              </div>
+                            <div className="d-flex justify-content-between">
+                              <span>₹{item.price.toLocaleString(undefined, { minimumFractionDigits: 2 })} X {item.quantity}</span>
+                              <span>₹{(item.price * item.quantity).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
                             </div>
-                          );
-                        }
-                        return items;
+                          </div>
+                        ));
                       })}
 
                       <hr className="my-4" style={{ borderColor: "#dee2e6" }} />

@@ -167,7 +167,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({ show, onHide,
         ...attendeeObj, 
         attendeeId,
         ticketName: ticketObj.ticketName,
-        ticketPrice: (ticketObj.ticketName && ticketObj.ticketName.includes('(Under')) ? 0 : (attendeeObj.ticketPrice ?? ticketObj.price ?? ticketObj.ticketPrice ?? 0),
+        ticketPrice: (ticketObj.ticketName && (ticketObj.ticketName.includes('(Under') || ticketObj.ticketName.includes('(Aged'))) ? 0 : (attendeeObj.ticketPrice ?? ticketObj.price ?? ticketObj.ticketPrice ?? 0),
         ticketStatus: attendeeObj.ticketStatus ?? "Unused",
         ticketId: attendeeObj.ticketId || ticketObj.ticketId || ticketObj.id || ticketObj._id,
         paymentStatus: booking?.paymentStatus || "Completed",
@@ -378,7 +378,13 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({ show, onHide,
                             onClick={() => handleDownloadTicket(
                               booking._id || (booking as any).id,
                               (attendee as any)._id || attendeeNo,
-                              { ...attendee, ticketStatus },
+                              { 
+                                ...attendee, 
+                                date_of_birth: (attendee as any).date_of_birth || matched?.date_of_birth,
+                                age: (attendee as any).age || matched?.age,
+                                relation: (attendee as any).relation || matched?.relation,
+                                ticketStatus 
+                              },
                               booking.eventId,
                               t
                             )}
