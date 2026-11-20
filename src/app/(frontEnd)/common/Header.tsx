@@ -1,7 +1,6 @@
 "use client";
 
-import logo from "@/assets/images/logo.png";
-import logoSm from "@/assets/images/logo-sm.png";
+const DEFAULT_LOGO = "/images/logo.png";
 import Icon from "@/components/wrappers/Icon";
 import { useLayoutContext } from "@/context/useLayoutContext";
 import useScrollEvent from "@/hooks/useScrollEvent";
@@ -128,15 +127,15 @@ export default function Header() {
 
   const siteLogoSrc = useMemo(() => {
     if (logoError || !currentLogoSetting) {
-      return logo;
+      return DEFAULT_LOGO;
     }
     if (typeof currentLogoSetting === "object" && currentLogoSetting.src) {
-      return currentLogoSetting;
+      return currentLogoSetting.src;
     }
     if (typeof currentLogoSetting === "string") {
       const clean = currentLogoSetting.trim();
       if (!clean || clean === "null" || clean === "undefined") {
-        return logo;
+        return DEFAULT_LOGO;
       }
       if (clean.startsWith("http://") || clean.startsWith("https://") || clean.startsWith("data:")) {
         return clean;
@@ -146,7 +145,7 @@ export default function Header() {
       }
       return `/${clean}`;
     }
-    return logo;
+    return DEFAULT_LOGO;
   }, [currentLogoSetting, logoError]);
 
   const [menuLoading, setMenuLoading] = useState(true);
@@ -210,7 +209,7 @@ export default function Header() {
           <Container>
             <div className="nav-inner">
               <div className="auth-brand mb-0">
-                <Link href="/" className="logo-dark d-flex align-items-center gap-2 text-decoration-none">
+                <Link href={'https://aisgwb.org/'} className="logo-dark d-flex align-items-center gap-2 text-decoration-none">
                   {isMounted ? (
                     <Image
                       src={siteLogoSrc}
@@ -223,12 +222,13 @@ export default function Header() {
                     />
                   ) : (
                     <Image
-                      src={logo}
-                      alt="dark logo"
+                      src={DEFAULT_LOGO}
+                      alt={setting("general.title", "AISGWB")}
                       height={32}
                       width={150}
                       style={{ objectFit: 'contain' }}
                       priority
+                      unoptimized
                     />
                   )}
                 </Link>

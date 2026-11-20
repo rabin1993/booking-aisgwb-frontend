@@ -1,12 +1,14 @@
-import logo from "@/assets/images/logo.png";
 import { currentYear, META_DATA } from "@/config/constants";
 import { Icon as IconifyIcon } from "@iconify/react";
-import Image from "next/image";
 import Link from "next/link";
 import { Col, Container, Row } from "react-bootstrap";
-import { footerLinks, socialLinks } from "../landing/components/data";
-
+import { useSettingsContext } from "@/context/useSettingsContext";
 const Footer = () => {
+  const { setting } = useSettingsContext();
+  const facebook = setting("general.facebook", "");
+  const youtube = setting("general.youtube", "");
+  const email = setting("general.support_email", META_DATA.email);
+  const address = setting("general.website_address", "");
   return (
     <footer className="section-custom section-footer pt-5 pb-3">
       <Container>
@@ -15,26 +17,40 @@ const Footer = () => {
             <h4>Quick link</h4>
             <ul className="footer-link">
               <li>
-                <Link href="" className="text-white">About Us</Link>
+                <Link href="https://aisgwb.org/about" className="text-white">About Us</Link>
               </li>
               <li>
-                <Link href="" className="text-white">Members</Link>
+                <Link href="https://aisgwb.org/members" className="text-white">Members</Link>
               </li>
               <li>
-                <Link href="" className="text-white">Contact Us</Link>
+                <Link href="https://aisgwb.org/contact-us" className="text-white">Contact Us</Link>
               </li>
               <li>
-                <Link href="" className="text-white">Events</Link>
+                <Link href="https://booking.aisgwb.org" className="text-white">Events</Link>
               </li>
             </ul>
             <div className="social-links">
               <h5 className="text-white">Follow Us</h5>
               <ul>
                 <li>
-                  <Link href="" className=""><IconifyIcon icon="simple-icons:facebook" width="24" height="24" /></Link>
+                  <Link
+                    href={facebook || "#"}
+                    target={facebook ? "_blank" : undefined}
+                    rel={facebook ? "noopener noreferrer" : undefined}
+                    aria-label="Facebook"
+                  >
+                    <IconifyIcon icon="simple-icons:facebook" width="24" height="24" />
+                  </Link>
                 </li>
                 <li>
-                  <Link href="" className=""><IconifyIcon icon="simple-icons:youtube" width="24" height="24" /></Link>
+                  <Link
+                    href={youtube || "#"}
+                    target={youtube ? "_blank" : undefined}
+                    rel={youtube ? "noopener noreferrer" : undefined}
+                    aria-label="YouTube"
+                  >
+                    <IconifyIcon icon="simple-icons:youtube" width="24" height="24" />
+                  </Link>
                 </li>
               </ul>
             </div>
@@ -45,15 +61,23 @@ const Footer = () => {
             <ul className="contact-info">
               <li>
                 <p>
-                  12A, Suhasini Ganguly Sarani,<br />
-                  Kalighat (Near Harish Park)<br />
-                  Kolkata - 700 025
+                  {address ? (
+                    address
+                  ) : (
+                    <>
+                      12A, Suhasini Ganguly Sarani,<br />
+                      Kalighat (Near Harish Park)<br />
+                      Kolkata - 700 025
+                    </>
+                  )}
                 </p>
               </li>
               <li>
                 <p>
                   <strong>Email us at:</strong><br />
-                  {META_DATA.email}
+                  <a href={`mailto:${email || META_DATA.email}`} className="text-white text-decoration-none">
+                    {email || META_DATA.email}
+                  </a>
                 </p>
               </li>
             </ul>
