@@ -25,24 +25,34 @@ const initialState: UserState = {
 };
 
 export const fetchUsers = createAsyncThunk<
-  UserRecord[],
-  void,
+  { data: UserRecord[]; pagination?: PaginationInfo } | UserRecord[],
+  { page?: number; limit?: number; search?: string } | void,
   { rejectValue: string }
->("users/fetchUsers", async (_, { rejectWithValue }) => {
+>("users/fetchUsers", async (params, { rejectWithValue }) => {
   try {
     const token =
       typeof window !== "undefined"
         ? localStorage.getItem("token") || sessionStorage.getItem("token")
         : null;
-    const res = await fetch(`${API_BASE_URL}/admin/users`, {
+    let url = `${API_BASE_URL}/admin/users`;
+    const queryParams = new URLSearchParams();
+    if (params?.page) queryParams.append("page", params.page.toString());
+    queryParams.append("limit", (params?.limit || 1000).toString());
+    if (params?.search) queryParams.append("search", params.search);
+    url += `?${queryParams.toString()}`;
+
+    const res = await fetch(url, {
       headers: {
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
     });
-    if (!res.ok) throw new Error("Failed to fetch users");
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => null);
+      throw new Error(errJson?.message || "Failed to fetch users");
+    }
     const json = await res.json();
     if (json.success && json.data) {
-      return json.data;
+      return { data: json.data, pagination: json.pagination };
     }
     return rejectWithValue("Invalid data received");
   } catch (error: any) {
@@ -157,7 +167,12 @@ const userSlice = createSlice({
     });
     builder.addCase(fetchUsers.fulfilled, (state, action) => {
       state.loading = false;
-      state.users = action.payload;
+      if (Array.isArray(action.payload)) {
+        state.users = action.payload;
+      } else {
+        state.users = action.payload.data;
+        state.pagination = action.payload.pagination;
+      }
     });
     builder.addCase(fetchUsers.rejected, (state, action) => {
       state.loading = false;
@@ -172,6 +187,9 @@ const userSlice = createSlice({
     builder.addCase(addUser.fulfilled, (state, action) => {
       state.loading = false;
       state.users.push(action.payload);
+      if (state.pagination) {
+        state.pagination.total += 1;
+      }
     });
     builder.addCase(addUser.rejected, (state, action) => {
       state.loading = false;
@@ -213,6 +231,9 @@ const userSlice = createSlice({
     builder.addCase(deleteUser.fulfilled, (state, action) => {
       state.loading = false;
       state.users = state.users.filter((u) => u.id !== action.payload);
+      if (state.pagination) {
+        state.pagination.total = Math.max(0, state.pagination.total - 1);
+      }
     });
     builder.addCase(deleteUser.rejected, (state, action) => {
       state.loading = false;

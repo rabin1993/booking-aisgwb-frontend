@@ -83,7 +83,7 @@ const UserListContent: React.FC = () => {
   const [alertMsg, setAlertMsg] = useState<string | null>(null);
 
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 8 });
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [selectedRowIds, setSelectedRowIds] = useState<Record<string, boolean>>(
     {},
   );
@@ -506,7 +506,7 @@ const UserListContent: React.FC = () => {
                 value={table.getState().pagination.pageSize}
                 onChange={(e) => table.setPageSize(Number(e.target.value))}
               >
-                {[5, 8, 10, 15, 20].map((size) => (
+                {[10, 15, 20 , 50, 100].map((size) => (
                   <option key={size} value={size}>
                     {size}
                   </option>
@@ -683,7 +683,7 @@ const UserListContent: React.FC = () => {
                   setSearchTerm("");
                   setGroupFilter("All");
                   setStatusFilter("All");
-                  table.setPageSize(8);
+                  table.setPageSize(10);
                 }}
                 title="Reset"
               >
@@ -718,10 +718,10 @@ const UserListContent: React.FC = () => {
               table={table}
               emptyMessage="No users found matching your criteria."
             />
-            {filteredUsers.length > 0 && reduxPagination && (
+            {totalItems > 0 && (
               <CardFooter className="border-0 bg-white pt-2 pb-4 px-4">
                 <TablePagination
-                  totalItems={reduxPagination.total}
+                  totalItems={totalItems}
                   start={start}
                   end={end}
                   previousPage={() => table.previousPage()}
