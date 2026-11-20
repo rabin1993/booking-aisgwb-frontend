@@ -33,6 +33,7 @@ import { useAppDispatch, useAppSelector } from "@/redux/hooks";
 import {
   fetchAttendees,
   deleteAttendee,
+  bulkDeleteAttendees,
   updateAttendee,
   resendTicketEmail
 } from "@/redux/slices/admin/attendeeSlice";
@@ -66,6 +67,12 @@ const AttendeeListContent: React.FC = () => {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [selectedRowIds, setSelectedRowIds] = useState<Record<string, boolean>>({});
+
+  const selectedAttendeeIds = useMemo(() => {
+    return Object.entries(selectedRowIds)
+      .filter(([_, isSelected]) => Boolean(isSelected))
+      .map(([id]) => id);
+  }, [selectedRowIds]);
 
   const [resendingAttendee, setResendingAttendee] = useState<AttendeeRecord | null>(null);
   const [resendingEventDetails, setResendingEventDetails] = useState<any>(null);
@@ -103,7 +110,11 @@ const AttendeeListContent: React.FC = () => {
           .unwrap()
           .then(() => {
             Swal.fire("Deleted!", "The attendee has been deleted.", "success");
-            setSelectedRowIds({});
+            setSelectedRowIds((prev) => {
+              const next = { ...prev };
+              delete next[id];
+              return next;
+            });
           })
           .catch((err) => {
             Swal.fire("Error!", err || "Failed to delete attendee.", "error");
@@ -113,12 +124,11 @@ const AttendeeListContent: React.FC = () => {
   };
 
   const handleConfirmBulkDelete = () => {
-    const selectedIds = Object.keys(selectedRowIds);
-    if (selectedIds.length === 0) return;
+    if (selectedAttendeeIds.length === 0) return;
 
     Swal.fire({
       title: "Delete Selected Attendees?",
-      text: `Are you sure you want to delete ${selectedIds.length} attendee${selectedIds.length > 1 ? "s" : ""}? This action cannot be undone.`,
+      text: `Are you sure you want to delete ${selectedAttendeeIds.length} attendee${selectedAttendeeIds.length > 1 ? "s" : ""}? This action cannot be undone.`,
       icon: "warning",
       showCancelButton: true,
       confirmButtonColor: "#d33",
@@ -128,24 +138,39 @@ const AttendeeListContent: React.FC = () => {
       reverseButtons: true,
     }).then(async (result) => {
       if (result.isConfirmed) {
-        let deletedCount = 0;
-        for (const id of selectedIds) {
-          try {
-            await dispatch(deleteAttendee(id)).unwrap();
-            deletedCount++;
-          } catch (err) {
-            console.error(err);
+        try {
+          await dispatch(bulkDeleteAttendees(selectedAttendeeIds)).unwrap();
+          setSelectedRowIds({});
+          Swal.fire({
+            title: "Deleted!",
+            text: `${selectedAttendeeIds.length} attendee${selectedAttendeeIds.length > 1 ? "s have" : " has"} been deleted.`,
+            icon: "success",
+            timer: 1500,
+            showConfirmButton: false,
+          });
+        } catch (err: any) {
+          let deletedCount = 0;
+          for (const id of selectedAttendeeIds) {
+            try {
+              await dispatch(deleteAttendee(id)).unwrap();
+              deletedCount++;
+            } catch (singleErr) {
+              console.error(`Failed to delete attendee ${id}:`, singleErr);
+            }
+          }
+          setSelectedRowIds({});
+          if (deletedCount > 0) {
+            Swal.fire({
+              title: "Deleted!",
+              text: `${deletedCount} attendee${deletedCount > 1 ? "s have" : " has"} been deleted.`,
+              icon: "success",
+              timer: 1500,
+              showConfirmButton: false,
+            });
+          } else {
+            Swal.fire("Error!", err || "Failed to delete attendees.", "error");
           }
         }
-        
-        setSelectedRowIds({});
-        Swal.fire({
-          title: "Deleted!",
-          text: `${deletedCount} attendee${deletedCount > 1 ? "s have" : " has"} been deleted.`,
-          icon: "success",
-          timer: 1200,
-          showConfirmButton: false,
-        });
       }
     });
   };
@@ -633,6 +658,7 @@ const AttendeeListContent: React.FC = () => {
   const table = useReactTable({
     data: filteredAttendees,
     columns,
+    getRowId: (row) => row._id || (row as any).id || "",
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
@@ -748,9 +774,9 @@ const AttendeeListContent: React.FC = () => {
               <Icon icon="search" className="app-search-icon text-muted" />
             </div>
 
-            {canDelete && Object.keys(selectedRowIds).length > 0 && (
-              <Button variant="danger" size="sm" onClick={handleConfirmBulkDelete}>
-                Delete ({Object.keys(selectedRowIds).length})
+            {canDelete && selectedAttendeeIds.length > 0 && (
+              <Button variant="danger" size="sm" onClick={handleConfirmBulkDelete} className="d-flex align-items-center gap-1">
+                <Icon icon="trash-2" className="fs-sm" /> Delete ({selectedAttendeeIds.length})
               </Button>
             )}
 

@@ -1,4 +1,4 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import { AttendeeRecord } from '@/app/admin/dataStore';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
@@ -233,6 +233,31 @@ export const deleteAttendee = createAsyncThunk<
   }
 });
 
+export const bulkDeleteAttendees = createAsyncThunk<
+  string[],
+  string[],
+  { rejectValue: string }
+>('attendees/bulkDeleteAttendees', async (ids, { rejectWithValue }) => {
+  try {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('token') || sessionStorage.getItem('token') : null;
+    const res = await fetch(`${API_BASE_URL}/admin/attendees/bulk-delete`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {})
+      },
+      body: JSON.stringify({ ids }),
+    });
+    const json = await res.json();
+    if (!res.ok || !json.success) {
+      return rejectWithValue(json.message || 'Failed to bulk delete attendees');
+    }
+    return ids;
+  } catch (error: any) {
+    return rejectWithValue(error.message || 'Error bulk deleting attendees');
+  }
+});
+
 export const resendTicketEmail = createAsyncThunk<
   { success: boolean; message: string },
   { id: string; ticketPdfBase64?: string; invoicePdfBase64?: string },
@@ -282,6 +307,13 @@ const attendeeSlice = createSlice({
       })
       .addCase(deleteAttendee.fulfilled, (state, action) => {
         state.attendees = state.attendees.filter(a => a._id !== action.payload && a.id !== action.payload);
+      })
+      .addCase(bulkDeleteAttendees.fulfilled, (state, action: PayloadAction<string[]>) => {
+        const idSet = new Set(action.payload.map(id => id.toString()));
+        state.attendees = state.attendees.filter(a => {
+          const aId = (a._id || a.id || '').toString();
+          return !idSet.has(aId);
+        });
       })
       .addCase(updateAttendee.fulfilled, (state, action) => {
         const index = state.attendees.findIndex(a => (a._id || a.id) === (action.payload._id || action.payload.id));
