@@ -59,6 +59,47 @@ const AttendeeListContent: React.FC = () => {
   const { read: canRead, write: canWrite, delete: canDelete, export: canExport } = useAccess("Attendees");
   const { setting } = useSettingsContext();
   const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+  const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
+
+  const getDisplayTicketName = (att: any) => {
+    if (!att) return 'Event Ticket';
+    const rawTicketName = att.ticketName || att.ticketId?.ticketName || 'Event Ticket';
+    const cleanBase = rawTicketName.replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
+
+    let ageNum = parseInt(att.age);
+    if (isNaN(ageNum) && att.date_of_birth) {
+      const dobParts = String(att.date_of_birth).split('-');
+      if (dobParts.length >= 3) {
+        const bYear = parseInt(dobParts[0], 10);
+        const bMonth = parseInt(dobParts[1], 10);
+        const bDay = parseInt(dobParts[2], 10);
+        if (!isNaN(bYear)) {
+          const today = new Date();
+          let calcAge = today.getFullYear() - bYear;
+          const curM = today.getMonth() + 1;
+          const curD = today.getDate();
+          if (curM < bMonth || (curM === bMonth && curD < bDay)) calcAge--;
+          if (calcAge >= 0) ageNum = calcAge;
+        }
+      }
+    }
+
+    const isAccompanying = Boolean(
+      att.relation ||
+      cleanBase.toLowerCase().includes('accompany') ||
+      rawTicketName.toLowerCase().includes('accompany') ||
+      att.isPrimary === false
+    );
+
+    const isUnderAge = isAccompanying && !isNaN(ageNum) && ageNum <= underAgeLimit;
+    const isAboveAge = !isAccompanying && !isNaN(ageNum) && ageNum >= agedAboveLimit;
+    const shouldShowAge = isUnderAge || isAboveAge;
+
+    const effectiveAge = att.age || (!isNaN(ageNum) ? String(ageNum) : '');
+    return shouldShowAge && effectiveAge
+      ? `${cleanBase || 'Event Ticket'} (Aged ${effectiveAge})`
+      : (cleanBase || 'Event Ticket');
+  };
 
   // Filtering state
   const [searchTerm, setSearchTerm] = useState("");
@@ -269,21 +310,21 @@ const AttendeeListContent: React.FC = () => {
             eventName: fullBooking.eventId?.title || 'Event',
             tickets: rawTickets.flatMap((t: any) => {
               const attList = Array.isArray(t?.attendees) ? t.attendees : [];
-              const regularAttendees = attList.filter((a: any) => !(t.ticketName && t.ticketName.includes('(Under')));
-              const underAgeAttendees = attList.filter((a: any) => (t.ticketName && t.ticketName.includes('(Under')));
+              const regularAttendees = attList.filter((a: any) => !(t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
+              const freeAttendees = attList.filter((a: any) => (t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
               const items = [];
               if (regularAttendees.length > 0) {
                 items.push({
-                  name: t.ticketName?.replace(/ \(Under \d+\)/, '') || "Event Ticket",
+                  name: t.ticketName?.replace(/\s*\((Under|Aged)[^)]*\)/gi, '') || "Event Ticket",
                   quantity: regularAttendees.length,
                   unitPrice: `₹ ${Number(t.price || 0).toFixed(2)}`,
                   totalPrice: `₹ ${Number((t.price || 0) * regularAttendees.length).toFixed(2)}`
                 });
               }
-              if (underAgeAttendees.length > 0) {
+              if (freeAttendees.length > 0) {
                 items.push({
                   name: t.ticketName || "Event Ticket",
-                  quantity: underAgeAttendees.length,
+                  quantity: freeAttendees.length,
                   unitPrice: `₹ 0.00`,
                   totalPrice: `₹ 0.00`
                 });
@@ -679,7 +720,7 @@ const AttendeeListContent: React.FC = () => {
     const csvContent = [
       headers.join(","),
       ...attendees.map((a) => {
-        return `"${a._id}","${a.name}","${a.eventId?.title || ''}","${a.ticketId?.ticketName || ''}",${a.ticketPrice},"${a.ticketStatus}","${a.paymentStatus}","${dayjs(a.createdAt).format("YYYY-MM-DD")}"`
+        return `"${a._id}","${a.name}","${a.eventId?.title || ''}","${getDisplayTicketName(a)}",${a.ticketPrice},"${a.ticketStatus}","${a.paymentStatus}","${dayjs(a.createdAt).format("YYYY-MM-DD")}"`
       }),
     ].join("\n");
     const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
@@ -862,18 +903,7 @@ const AttendeeListContent: React.FC = () => {
       />
       
       {resendingAttendee && (() => {
-        // The Attendee model has NO ticketName field.
-        // ticketId.ticketName is always the BASE name (e.g. "For Accompanying Person")
-        // The "(Under X)" suffix is derived from: ticketPrice === 0 + age present + accompanying ticket
-        const baseTicketName = resendingAttendee.ticketId?.ticketName || 'Event Ticket';
-        const isUnderAge =
-          resendingAttendee.ticketPrice === 0 &&
-          resendingAttendee.age &&
-          !isNaN(parseInt(resendingAttendee.age)) &&
-          baseTicketName.toLowerCase().includes('accompanying');
-        const safeTicketName = isUnderAge
-          ? `${baseTicketName} (Under ${underAgeLimit})`
-          : baseTicketName;
+        const safeTicketName = getDisplayTicketName(resendingAttendee);
 
         return (
           <div style={{ position: "fixed", top: 0, left: 0, width: "800px", opacity: 0, pointerEvents: "none", zIndex: -9999 }}>

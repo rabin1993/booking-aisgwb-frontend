@@ -67,10 +67,18 @@ const Account = () => {
   }, [user, dispatch]);
 
   const [showLifeMemberModal, setShowLifeMemberModal] = useState(false);
+  const [lifeMemberNotice, setLifeMemberNotice] = useState<string | null>(null);
   const [membershipForm, setMembershipForm] = useState({
     centralMembershipId: ""
   });
   const [isApplying, setIsApplying] = useState(false);
+
+  const handleActiveLifeMember = () => {
+    const msg = "Coming Soon! Life Time Membership activation will be available shortly.";
+    toast(msg, { icon: "ℹ️", duration: 4000 });
+    setLifeMemberNotice(msg);
+    setTimeout(() => setLifeMemberNotice(null), 5000);
+  };
 
   useEffect(() => {
     if (showLifeMemberModal && !membershipSettings) {
@@ -410,9 +418,24 @@ const Account = () => {
                       Your previous application was rejected. You can apply again.
                     </div>
                   )}
-                  <button className="btn btn-primary btn-sm px-4" onClick={() => setShowLifeMemberModal(true)}>
+
+                  {/* <button className="btn btn-primary btn-sm px-4" onClick={() => setShowLifeMemberModal(true)}>
+                    Active Life Member
+                  </button> */}
+
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm px-4"
+                    onClick={handleActiveLifeMember}
+                  >
                     Active Life Member
                   </button>
+                  {lifeMemberNotice && (
+                    <div className="alert alert-info py-2 px-3 small mt-3 mb-0 d-flex align-items-center gap-2">
+                      <IconifyIcon icon="lucide:info" width="16" className="flex-shrink-0" />
+                      <span>{lifeMemberNotice}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>

@@ -261,7 +261,7 @@ export const fetchFrontendEventTickets = createAsyncThunk<
         const ticketId = t._id || t.id;
         const bookedCount = validAttendees.filter((a: any) => {
           const aTicketId = a.ticketId?._id || a.ticketId?.id || a.ticketId;
-          const isUnderAge = a.ticketName && typeof a.ticketName === 'string' && a.ticketName.includes('(Under');
+          const isUnderAge = a.ticketName && typeof a.ticketName === 'string' && (a.ticketName.includes('(Under') || (a.ticketName.includes('(Aged') && a.ticketName.toLowerCase().includes('accompany')));
           return aTicketId === ticketId && !isUnderAge;
         }).length;
 

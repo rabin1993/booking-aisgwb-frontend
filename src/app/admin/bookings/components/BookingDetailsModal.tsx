@@ -65,21 +65,21 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({ show, onHide,
         type: "Event",
         eventName: booking.eventId?.title || 'Event',
         tickets: booking.tickets.flatMap(t => {
-          const regularAttendees = t.attendees.filter(a => !(t.ticketName && t.ticketName.includes('(Under')));
-          const underAgeAttendees = t.attendees.filter(a => (t.ticketName && t.ticketName.includes('(Under')));
+          const regularAttendees = t.attendees.filter(a => !(t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
+          const freeAttendees = t.attendees.filter(a => (t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
           const items = [];
           if (regularAttendees.length > 0) {
             items.push({
-              name: t.ticketName?.replace(/ \(Under \d+\)/, '') || "Event Ticket",
+              name: t.ticketName?.replace(/\s*\((Under|Aged)[^)]*\)/gi, '') || "Event Ticket",
               quantity: regularAttendees.length,
               unitPrice: `₹ ${Number(t.price || 0).toFixed(2)}`,
               totalPrice: `₹ ${Number((t.price || 0) * regularAttendees.length).toFixed(2)}`
             });
           }
-          if (underAgeAttendees.length > 0) {
+          if (freeAttendees.length > 0) {
             items.push({
               name: t.ticketName || "Event Ticket",
-              quantity: underAgeAttendees.length,
+              quantity: freeAttendees.length,
               unitPrice: `₹ 0.00`,
               totalPrice: `₹ 0.00`
             });
@@ -96,6 +96,12 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({ show, onHide,
         }),
         quantity: booking.tickets.reduce((sum, t) => sum + t.quantity, 0),
         unitPrice: `₹ ${booking.totalAmount}`,
+        user: {
+          name: `${booking.billingInfo?.firstName || ""} ${booking.billingInfo?.lastName || ""}`.trim() || (booking.userId as any)?.name || (booking.userId as any)?.fullName || "",
+          email: booking.billingInfo?.email || (booking.userId as any)?.email,
+          phone: booking.billingInfo?.phone || (booking.userId as any)?.mobile || (booking.userId as any)?.phone,
+          memberId: (booking.userId as any)?.memberId || ""
+        }
       };
 
       setDownloadingTxn(provisionalTxn);
@@ -434,11 +440,11 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({ show, onHide,
       <div style={{ position: "absolute", top: "-9999px", left: "-9999px", width: "800px" }}>
         <InvoiceTemplate 
           transaction={downloadingTxn} 
-          user={{ 
-            name: `${booking.billingInfo?.firstName || ""} ${booking.billingInfo?.lastName || ""}`.trim() || "", 
-            email: booking.billingInfo?.email, 
-            phone: booking.billingInfo?.phone,
-            memberId: booking.userId?.memberId || ""
+          user={downloadingTxn.user || { 
+            name: `${booking.billingInfo?.firstName || ""} ${booking.billingInfo?.lastName || ""}`.trim() || (booking.userId as any)?.name || "", 
+            email: booking.billingInfo?.email || (booking.userId as any)?.email, 
+            phone: booking.billingInfo?.phone || (booking.userId as any)?.mobile || (booking.userId as any)?.phone,
+            memberId: (booking.userId as any)?.memberId || ""
           }} 
           id="admin-booking-invoice-template" 
         />

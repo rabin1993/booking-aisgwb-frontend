@@ -34,6 +34,15 @@ interface InvoiceTemplateProps {
 export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, user, id }) => {
   const { setting } = useSettingsContext();
 
+  const effectiveUser = (user && (user.name || user.email || user.phone || user.firstName)) 
+    ? user 
+    : ((transaction as any)?.user || user || {});
+
+  const displayName = effectiveUser?.name || effectiveUser?.fullName || 
+    `${effectiveUser?.firstName || ''} ${effectiveUser?.lastName || ''}`.trim() || '';
+  const displayEmail = effectiveUser?.email || 'N/A';
+  const displayPhone = effectiveUser?.phone || effectiveUser?.mobile || 'N/A';
+
   return (
     <div id={id || "invoice-template-container"} style={{ width: '800px', padding: '40px', backgroundColor: '#fff', color: '#333', fontFamily: 'sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '40px' }}>
@@ -59,9 +68,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, u
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
         <div>
           <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '8px' }}>Booked By</p>
-          <p style={{ margin: 0, fontWeight: 'bold', color: '#1f2937', marginBottom: '4px' }}>{user?.name || user?.fullName || ''}</p>
-          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px', marginBottom: '2px' }}>Email: {user?.email || 'N/A'}</p>
-          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Phone: {user?.phone || user?.mobile || 'N/A'}</p>
+          {displayName && (
+            <p style={{ margin: 0, fontWeight: 'bold', color: '#1f2937', marginBottom: '4px' }}>{displayName}</p>
+          )}
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px', marginBottom: '2px' }}>Email: {displayEmail}</p>
+          <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Phone: {displayPhone}</p>
         </div>
         <div style={{ textAlign: 'right', minWidth: '150px' }}>
           <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '4px' }}>Invoice Date</p>
@@ -126,11 +137,11 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, u
       </div>
 
       <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '4px', marginBottom: '24px' }}>
-        <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Note: For any queries, please contact {setting("general.support_email", "")}.</p>
+        <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Note: For Any Assistance Or Queries, please contact {setting("general.support_email", "")}.</p>
       </div>
       <div style={{ textAlign: 'right' }}>
-        <p style={{ margin: 0, fontSize: '14px', color: '#1f2937', fontWeight: 'bold', marginBottom: '4px' }}>Thank you for being a part of this event!</p>
-        <p style={{ margin: 0, fontSize: '14px', color: '#1f2937', fontWeight: 'bold' }}>warm regards,<br />{setting("general.title", "AISGWB")}</p>
+        <p style={{ margin: 0, fontSize: '14px', color: '#1f2937', fontWeight: 'bold', marginBottom: '4px' }}>Thank you for being a part of this Conference!</p>
+        <p style={{ margin: 0, fontSize: '14px', color: '#1f2937', fontWeight: 'bold' }}>Warm Regards,<br />{setting("general.title", "AISGWB")} Team</p>
       </div>
     </div>
   );

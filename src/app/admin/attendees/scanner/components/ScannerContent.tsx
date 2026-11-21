@@ -16,6 +16,7 @@ const ScannerContent = () => {
   const dispatch = useAppDispatch();
   const { setting } = useSettingsContext();
   const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+  const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
 
   const [loading, setLoading] = useState(true);
   const [attendee, setAttendee] = useState<AttendeeRecord | null>(null);
@@ -131,14 +132,40 @@ const ScannerContent = () => {
     (typeof attendee.ticketId === 'object' ? attendee.ticketId?.ticketName : attendee.ticketId) || 
     'Event Ticket'
   ).toString();
-  const cleanBaseName = rawTicketName.replace(/\s*\(Under\s*\d+[^)]*\)/gi, '').trim();
-  const isAccompanyingUnderAge =
-    attendee.age &&
-    !isNaN(parseInt(attendee.age as string)) &&
-    parseInt(attendee.age as string) <= underAgeLimit &&
-    (cleanBaseName.toLowerCase().includes('accompanying') || rawTicketName.toLowerCase().includes('accompanying'));
-  const displayTicketType = isAccompanyingUnderAge
-    ? `${cleanBaseName} (Under ${underAgeLimit})`
+  const cleanBaseName = rawTicketName.replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
+
+  let ageNum = parseInt(attendee.age as string);
+  if (isNaN(ageNum) && (attendee as any).date_of_birth) {
+    const dobParts = String((attendee as any).date_of_birth).split('-');
+    if (dobParts.length >= 3) {
+      const bYear = parseInt(dobParts[0], 10);
+      const bMonth = parseInt(dobParts[1], 10);
+      const bDay = parseInt(dobParts[2], 10);
+      if (!isNaN(bYear)) {
+        const today = new Date();
+        let calcAge = today.getFullYear() - bYear;
+        const curM = today.getMonth() + 1;
+        const curD = today.getDate();
+        if (curM < bMonth || (curM === bMonth && curD < bDay)) calcAge--;
+        if (calcAge >= 0) ageNum = calcAge;
+      }
+    }
+  }
+
+  const isAccompanying = Boolean(
+    (attendee as any).relation ||
+    cleanBaseName.toLowerCase().includes('accompany') ||
+    rawTicketName.toLowerCase().includes('accompany') ||
+    (attendee as any).isPrimary === false
+  );
+
+  const isUnderAge = isAccompanying && !isNaN(ageNum) && ageNum <= underAgeLimit;
+  const isAboveAge = !isAccompanying && !isNaN(ageNum) && ageNum >= agedAboveLimit;
+  const shouldShowAge = isUnderAge || isAboveAge;
+
+  const effectiveAge = attendee.age || (!isNaN(ageNum) ? String(ageNum) : '');
+  const displayTicketType = shouldShowAge && effectiveAge
+    ? `${cleanBaseName} (Aged ${effectiveAge})`
     : rawTicketName;
   const eventTitle = typeof attendee.eventId === 'object' ? attendee.eventId?.title : (attendee.eventId || 'AISGWB Event');
 

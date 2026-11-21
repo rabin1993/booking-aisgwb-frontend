@@ -25,19 +25,44 @@ const TicketPrintModal: React.FC<TicketPrintModalProps> = ({
   if (!attendee) return null;
 
   const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+  const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
 
-  // The Attendee model has NO ticketName field.
-  // ticketId.ticketName is always the BASE name (e.g. "For Accompanying Person")
-  // The "(Under X)" suffix is derived from: ticketPrice === 0 + age present + accompanying ticket
-  const baseTicketName = attendee.ticketId?.ticketName || '';
-  const isUnderAge =
-    attendee.ticketPrice === 0 &&
-    attendee.age &&
-    !isNaN(parseInt(attendee.age)) &&
-    baseTicketName.toLowerCase().includes('accompanying');
-  const resolvedTicketName = isUnderAge
-    ? `${baseTicketName} (Under ${underAgeLimit})`
-    : (baseTicketName || 'Event Ticket');
+  const rawTicketName = attendee.ticketName || attendee.ticketId?.ticketName || '';
+  const cleanBase = rawTicketName.replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
+
+  let ageNum = parseInt(attendee.age);
+  if (isNaN(ageNum) && attendee.date_of_birth) {
+    const dobParts = String(attendee.date_of_birth).split('-');
+    if (dobParts.length >= 3) {
+      const bYear = parseInt(dobParts[0], 10);
+      const bMonth = parseInt(dobParts[1], 10);
+      const bDay = parseInt(dobParts[2], 10);
+      if (!isNaN(bYear)) {
+        const today = new Date();
+        let calcAge = today.getFullYear() - bYear;
+        const curM = today.getMonth() + 1;
+        const curD = today.getDate();
+        if (curM < bMonth || (curM === bMonth && curD < bDay)) calcAge--;
+        if (calcAge >= 0) ageNum = calcAge;
+      }
+    }
+  }
+
+  const isAccompanying = Boolean(
+    attendee.relation ||
+    cleanBase.toLowerCase().includes('accompany') ||
+    rawTicketName.toLowerCase().includes('accompany') ||
+    attendee.isPrimary === false
+  );
+
+  const isUnderAge = isAccompanying && !isNaN(ageNum) && ageNum <= underAgeLimit;
+  const isAboveAge = !isAccompanying && !isNaN(ageNum) && ageNum >= agedAboveLimit;
+  const shouldShowAge = isUnderAge || isAboveAge;
+
+  const effectiveAge = attendee.age || (!isNaN(ageNum) ? String(ageNum) : '');
+  const resolvedTicketName = shouldShowAge && effectiveAge
+    ? `${cleanBase || 'Event Ticket'} (Aged ${effectiveAge})`
+    : (cleanBase || 'Event Ticket');
 
   const eventIdStr = typeof attendee.eventId === 'string' 
     ? attendee.eventId 

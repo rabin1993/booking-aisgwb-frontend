@@ -335,7 +335,7 @@ const BookingWizard = () => {
 
     const bookedCount = eventAttendees.filter(a => {
       const aTicketId = a.ticketId?._id || a.ticketId?.id || a.ticketId;
-      const isUnderAge = a.ticketName && typeof a.ticketName === 'string' && a.ticketName.includes('(Under');
+      const isUnderAge = a.ticketName && typeof a.ticketName === 'string' && (a.ticketName.includes('(Under') || (a.ticketName.includes('(Aged') && a.ticketName.toLowerCase().includes('accompany')));
       return (aTicketId === ticket._id || aTicketId === ticket.id) && a.ticketStatus !== 'Cancelled' && !isUnderAge;
     }).length;
     const remaining = Math.max(0, (ticket.numberOfTickets || 0) - bookedCount);

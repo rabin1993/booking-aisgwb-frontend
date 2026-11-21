@@ -91,14 +91,45 @@ const BookingListContent: React.FC = () => {
         status: booking.paymentStatus,
         type: "Event",
         eventName: booking.eventId?.title || 'Event',
-        tickets: booking.tickets.map(t => ({
-          name: t.ticketName || "Event Ticket",
-          quantity: t.quantity,
-          unitPrice: `₹ ${Number(t.price || 0).toFixed(2)}`,
-          totalPrice: `₹ ${Number((t.price || 0) * t.quantity).toFixed(2)}`
-        })),
+        tickets: booking.tickets.flatMap((t: any) => {
+          const attList = Array.isArray(t?.attendees) ? t.attendees : [];
+          const regularAttendees = attList.filter((a: any) => !(t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
+          const freeAttendees = attList.filter((a: any) => (t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
+          const items = [];
+          if (regularAttendees.length > 0) {
+            items.push({
+              name: t.ticketName?.replace(/\s*\((Under|Aged)[^)]*\)/gi, '') || "Event Ticket",
+              quantity: regularAttendees.length,
+              unitPrice: `₹ ${Number(t.price || 0).toFixed(2)}`,
+              totalPrice: `₹ ${Number((t.price || 0) * regularAttendees.length).toFixed(2)}`
+            });
+          }
+          if (freeAttendees.length > 0) {
+            items.push({
+              name: t.ticketName || "Event Ticket",
+              quantity: freeAttendees.length,
+              unitPrice: `₹ 0.00`,
+              totalPrice: `₹ 0.00`
+            });
+          }
+          if (items.length === 0) {
+            items.push({
+              name: t.ticketName || "Event Ticket",
+              quantity: t.quantity || 1,
+              unitPrice: `₹ ${Number(t.price || 0).toFixed(2)}`,
+              totalPrice: `₹ ${Number((t.price || 0) * (t.quantity || 1)).toFixed(2)}`
+            });
+          }
+          return items;
+        }),
         quantity: booking.tickets.reduce((sum, t) => sum + t.quantity, 0),
         unitPrice: `₹ ${booking.totalAmount}`,
+        user: {
+          name: `${booking.billingInfo?.firstName || ""} ${booking.billingInfo?.lastName || ""}`.trim() || (booking.userId as any)?.name || (booking.userId as any)?.fullName || "",
+          email: booking.billingInfo?.email || (booking.userId as any)?.email,
+          phone: booking.billingInfo?.phone || (booking.userId as any)?.mobile || (booking.userId as any)?.phone,
+          memberId: (booking.userId as any)?.memberId || ""
+        }
       };
 
       setDownloadingTxn(provisionalTxn);
@@ -107,13 +138,13 @@ const BookingListContent: React.FC = () => {
         const element = document.getElementById(`admin-booking-list-invoice-template-${booking._id}`);
         if (element) {
           try {
-            const canvas = await html2canvas(element, { scale: 2 });
-            const imgData = canvas.toDataURL("image/jpeg", 1.0);
+            const canvas = await html2canvas(element, { scale: 2, useCORS: true, allowTaint: true, windowWidth: 800 });
+            const imgData = canvas.toDataURL("image/png");
             const pdf = new jsPDF("p", "mm", "a4");
             const pdfWidth = pdf.internal.pageSize.getWidth();
             const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
             
-            pdf.addImage(imgData, "JPEG", 0, 0, pdfWidth, pdfHeight);
+            pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
             const pdfBase64 = pdf.output("datauristring");
 
             await dispatch(resendBookingInvoice({ id: booking._id, pdfBase64 })).unwrap();
@@ -560,10 +591,11 @@ const BookingListContent: React.FC = () => {
         <div style={{ position: "absolute", top: "-9999px", left: "-9999px" }}>
           <InvoiceTemplate 
             transaction={downloadingTxn} 
-            user={{ 
-              name: `${selectedBooking?.billingInfo?.firstName || ""} ${selectedBooking?.billingInfo?.lastName || ""}`.trim() || "", 
-              email: selectedBooking?.billingInfo?.email, 
-              phone: selectedBooking?.billingInfo?.phone 
+            user={downloadingTxn.user || { 
+              name: `${selectedBooking?.billingInfo?.firstName || ""} ${selectedBooking?.billingInfo?.lastName || ""}`.trim() || (selectedBooking?.userId as any)?.name || "", 
+              email: selectedBooking?.billingInfo?.email || (selectedBooking?.userId as any)?.email, 
+              phone: selectedBooking?.billingInfo?.phone || (selectedBooking?.userId as any)?.mobile || (selectedBooking?.userId as any)?.phone,
+              memberId: (selectedBooking?.userId as any)?.memberId || ""
             }} 
             id={`admin-booking-list-invoice-template-${downloadingTxn.id}`} 
           />
