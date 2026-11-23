@@ -37,7 +37,7 @@ const CheckoutClient = () => {
     const [pdfGenerationData, setPdfGenerationData] = useState<{bookingId: string, attendees: any[]} | null>(null);
 
     const [attendees, setAttendees] = useState<Attendee[]>([
-        { id: 1, name: '', age: '', date_of_birth: '', relation: '', ticketName: '' }
+        { id: 1, name: '', age: '', relation: '', ticketName: '', is_waiver: 'no', reason_waiver: '' }
     ]);
     const [invalidAttendeeIds, setInvalidAttendeeIds] = useState<number[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
@@ -115,10 +115,11 @@ const CheckoutClient = () => {
                                     id: idCounter++,
                                     name: prefillName,
                                     age: '',
-                                    date_of_birth: '',
                                     relation: '',
                                     ticketName: t.name,
-                                    isPrimary: isPrimary
+                                    isPrimary: isPrimary,
+                                    is_waiver: 'no',
+                                    reason_waiver: ''
                                 });
                             }
                         });
@@ -128,10 +129,11 @@ const CheckoutClient = () => {
                                 id: idCounter++,
                                 name: initialAttendees.length === 0 ? loggedInUserName : '',
                                 age: '',
-                                date_of_birth: '',
                                 relation: '',
                                 ticketName: 'Attendee Pass',
-                                isPrimary: true
+                                isPrimary: true,
+                                is_waiver: 'no',
+                                reason_waiver: ''
                             });
                         }
                     }
@@ -203,9 +205,41 @@ const CheckoutClient = () => {
     const handleAttendeeChange = (id: number, field: string, value: string) => {
         setAttendees(prev => prev.map(a => {
             if (a.id !== id) return a;
-            if (field === 'date_of_birth') {
-                const computedAge = calculateAgeFromDob(value);
-                return { ...a, date_of_birth: value, age: computedAge };
+            if (field === 'is_waiver') {
+                const isYes = value === 'yes';
+                const defaultReason = isYes 
+                    ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`)
+                    : '';
+                return {
+                    ...a,
+                    is_waiver: value as 'yes' | 'no',
+                    reason_waiver: isYes ? (a.reason_waiver || defaultReason) : ''
+                };
+            }
+            if (field === 'age') {
+                const ageNum = parseInt(value, 10);
+                let isWaiver = a.is_waiver;
+                let reasonWaiver = a.reason_waiver;
+                if (!isNaN(ageNum)) {
+                    if (a.isPrimary !== false) {
+                        if (ageNum >= agedAboveLimit) {
+                            isWaiver = 'yes';
+                            reasonWaiver = reasonWaiver || `${agedAboveLimit} & Above`;
+                        } else {
+                            isWaiver = 'no';
+                            reasonWaiver = '';
+                        }
+                    } else {
+                        if (ageNum <= underAgeLimit && ageNum > 0) {
+                            isWaiver = 'yes';
+                            reasonWaiver = reasonWaiver || `${underAgeLimit} & Below`;
+                        } else {
+                            isWaiver = 'no';
+                            reasonWaiver = '';
+                        }
+                    }
+                }
+                return { ...a, age: value, is_waiver: isWaiver, reason_waiver: reasonWaiver };
             }
             return { ...a, [field]: value };
         }));
@@ -213,23 +247,9 @@ const CheckoutClient = () => {
         setInvalidAttendeeIds(prev => {
             const attendee = attendees.find(a => a.id === id);
             if (!attendee) return prev;
-            const updated = { 
-                ...attendee, 
-                [field]: value,
-                ...(field === 'date_of_birth' ? { age: calculateAgeFromDob(value) } : {})
-            };
-            const hasName = Boolean(updated.name && updated.name.trim() !== '');
-            if (updated.isPrimary !== false) {
-                const hasDob = Boolean(updated.date_of_birth && updated.date_of_birth.trim() !== '');
-                if (hasName && hasDob) {
-                    return prev.filter(invalidId => invalidId !== id);
-                }
-            } else {
-                const hasAge = Boolean(updated.age && updated.age.trim() !== '');
-                const hasRelation = Boolean(updated.relation && updated.relation.trim() !== '');
-                if (hasName && hasAge && hasRelation) {
-                    return prev.filter(invalidId => invalidId !== id);
-                }
+            const updatedName = field === 'name' ? value : attendee.name;
+            if (updatedName && updatedName.trim() !== '') {
+                return prev.filter(invalidId => invalidId !== id);
             }
             return prev;
         });
@@ -257,13 +277,18 @@ const CheckoutClient = () => {
     const getTicketInfoForAttendee = React.useCallback((a: Attendee) => {
         const ticket = tickets.find(t => t.name === a.ticketName);
         const ageNum = parseInt(a.age);
-        const isUnderAge = !a.isPrimary && !isNaN(ageNum) && ageNum <= underAgeLimit;
-        const isAboveAge = a.isPrimary && !isNaN(ageNum) && ageNum >= agedAboveLimit;
-        const shouldShowAge = isUnderAge || isAboveAge;
-        const finalPrice = shouldShowAge ? 0 : (ticket?.price || 0);
-        const cleanBase = (a.ticketName || ticket?.name || 'Ticket').replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
-        const finalName = shouldShowAge && a.age ? `${cleanBase} (Aged ${a.age})` : cleanBase;
-        return { ticket, ageNum, isUnderAge, isAboveAge, shouldShowAge, finalPrice, finalName, cleanBase };
+        const isWaiver = a.is_waiver === 'yes';
+        const isUnderAge = !a.isPrimary && isWaiver;
+        const isAboveAge = a.isPrimary && isWaiver;
+        const shouldShowAge = isWaiver;
+        const finalPrice = isWaiver ? 0 : (ticket?.price || 0);
+        const cleanBase = (a.ticketName || ticket?.name || 'Ticket').replace(/\s*\((Under|)[^)]*\)/gi, '').trim();
+        const finalName = shouldShowAge && a.age 
+            ? `${cleanBase} ( ${a.age} & Above)` 
+            : shouldShowAge 
+                ? `${cleanBase} (${a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`})` 
+                : cleanBase;
+        return { ticket, ageNum, isUnderAge, isAboveAge, shouldShowAge, isWaiver, finalPrice, finalName, cleanBase };
     }, [tickets, underAgeLimit, agedAboveLimit]);
 
     const processedTickets = React.useMemo(() => {
@@ -306,30 +331,13 @@ const CheckoutClient = () => {
     const handleProceedToPayment = async () => {
         try {
             // Validate inputs
-            const invalidIds = attendees.filter(a => {
-                if (!a.name || a.name.trim() === '') return true;
-                if (a.isPrimary !== false) {
-                    if (!a.date_of_birth || a.date_of_birth.trim() === '') return true;
-                } else {
-                    if (!a.age || a.age.trim() === '') return true;
-                    if (!a.relation || a.relation.trim() === '') return true;
-                }
-                return false;
-            }).map(a => a.id);
+            const invalidIds = attendees.filter(a => !a.name || a.name.trim() === '').map(a => a.id);
             if (invalidIds.length > 0) {
                 setInvalidAttendeeIds(invalidIds);
-                toast.error("Please fill in all required fields for all attendees.");
+                toast.error("Please fill in the full name for all attendees.");
                 const firstInvalid = attendees.find(a => a.id === invalidIds[0]);
                 if (firstInvalid) {
-                    if (!firstInvalid.name || firstInvalid.name.trim() === '') {
-                        document.getElementById(`attendee-name-${firstInvalid.id}`)?.focus();
-                    } else if (firstInvalid.isPrimary !== false && (!firstInvalid.date_of_birth || firstInvalid.date_of_birth.trim() === '')) {
-                        document.getElementById(`attendee-dob-${firstInvalid.id}`)?.focus();
-                    } else if (firstInvalid.isPrimary === false && (!firstInvalid.age || firstInvalid.age.trim() === '')) {
-                        document.getElementById(`attendee-age-${firstInvalid.id}`)?.focus();
-                    } else if (firstInvalid.isPrimary === false && (!firstInvalid.relation || firstInvalid.relation.trim() === '')) {
-                        document.getElementById(`attendee-relation-${firstInvalid.id}`)?.focus();
-                    }
+                    document.getElementById(`attendee-name-${firstInvalid.id}`)?.focus();
                 }
                 return;
             }
@@ -374,9 +382,9 @@ const CheckoutClient = () => {
                                 return info.finalName === t.name && info.finalPrice === t.price;
                             }).map(a => ({ 
                                 name: a.name, 
-                                age: a.age, 
-                                date_of_birth: a.date_of_birth, 
-                                relation: a.relation 
+                                age: a.age || '', 
+                                relation: a.relation || '', 
+                                reason_waiver: a.reason_waiver || (a.is_waiver === 'yes' ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`) : '')
                             }))
                         })),
                         totalAmount,
@@ -388,9 +396,9 @@ const CheckoutClient = () => {
                         return {
                             eventId: checkoutData?.event?.id,
                             name: a.name,
-                            age: a.age,
-                            date_of_birth: a.date_of_birth,
-                            relation: a.relation,
+                            age: a.age || '',
+                            relation: a.relation || '',
+                            reason_waiver: a.reason_waiver || (a.is_waiver === 'yes' ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`) : ''),
                             ticketName: info.finalName,
                             ticketId: info.ticket?._id || info.ticket?.id,
                             ticketPrice: info.finalPrice,
@@ -418,6 +426,7 @@ const CheckoutClient = () => {
                         status: "Completed",
                         type: "Event Ticket",
                         eventName: eventDetails.title,
+                        user: user,
                         tickets: processedTickets.map(t => ({
                             name: t.name || "Event Ticket",
                             quantity: t.quantity,

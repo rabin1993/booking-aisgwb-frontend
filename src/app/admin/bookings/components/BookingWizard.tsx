@@ -42,7 +42,9 @@ const BookingWizard = () => {
   
   const { setting } = useSettingsContext();
   const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+  const underAgeNote = setting('general.under_age_note') || setting('under_age_note') || '';
   const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
+  const aboveAgeNote = setting('general.aged_above_note') || setting('aged_above_note') || '';
   const todayStr = dayjs().format("YYYY-MM-DD");
 
   const calculateAgeFromDob = (dobString: string): string => {
@@ -93,12 +95,17 @@ const BookingWizard = () => {
     const isAcc = isAccompanyingTicket(ticket);
     const ageNum = parseInt(att?.age);
 
-    const isUnderAge = isAcc && !isNaN(ageNum) && ageNum <= underAgeLimit;
-    const isAboveAge = !isAcc && !isNaN(ageNum) && ageNum >= agedAboveLimit;
-    const shouldShowAge = isUnderAge || isAboveAge;
+    const isWaiver = att?.is_waiver === 'yes';
+    const isUnderAge = isAcc && isWaiver;
+    const isAboveAge = !isAcc && isWaiver;
+    const shouldShowAge = isWaiver;
 
-    const finalPrice = shouldShowAge ? 0 : (ticket?.ticketPrice || 0);
-    const finalName = shouldShowAge && att?.age ? `${cleanBase} (Aged ${att.age})` : cleanBase;
+    const finalPrice = isWaiver ? 0 : (ticket?.ticketPrice || 0);
+    const finalName = shouldShowAge && att?.age 
+      ? `${cleanBase} (Aged ${att.age})` 
+      : shouldShowAge 
+        ? `${cleanBase} (${isAcc ? `${underAgeLimit} & Below` : `${agedAboveLimit} & Above`})`
+        : cleanBase;
 
     return {
       ticket,
@@ -108,6 +115,7 @@ const BookingWizard = () => {
       isUnderAge,
       isAboveAge,
       shouldShowAge,
+      isWaiver,
       finalPrice,
       finalName
     };
@@ -379,16 +387,38 @@ const BookingWizard = () => {
 
   const activeTickets = useMemo(() => {
     if (eventRegClosed && !isEdit) return [];
-    return tickets.filter((t: any) => {
-      if (t.isActive === false) return false;
-      const tId = t._id || t.id;
-      // In edit mode, retain tickets that are already part of this booking
-      if (isEdit && tId && (ticketSelections[tId] || 0) > 0) return true;
-      if (eventRegClosed) return false;
-      const status = getTicketDateStatus(t, selectedEvent);
-      return !status.isDateOver && !status.isUpcoming;
-    });
+    return tickets
+      .filter((t: any) => {
+        if (t.isActive === false) return false;
+        const tId = t._id || t.id;
+        // In edit mode, retain tickets that are already part of this booking
+        if (isEdit && tId && (ticketSelections[tId] || 0) > 0) return true;
+        if (eventRegClosed) return false;
+        const status = getTicketDateStatus(t, selectedEvent);
+        return !status.isDateOver && !status.isUpcoming;
+      })
+      .sort((a: any, b: any) => {
+        const isAccA = isAccompanyingTicket(a);
+        const isAccB = isAccompanyingTicket(b);
+        if (!isAccA && isAccB) return -1;
+        if (isAccA && !isAccB) return 1;
+        return 0;
+      });
   }, [tickets, selectedEvent, eventRegClosed, eventAttendees, isEdit, ticketSelections]);
+
+  const sortedSelectedTicketIds = useMemo(() => {
+    return Object.keys(ticketSelections)
+      .filter(id => ticketSelections[id] > 0)
+      .sort((a, b) => {
+        const ticketA = tickets.find(t => t._id === a || t.id === a);
+        const ticketB = tickets.find(t => t._id === b || t.id === b);
+        const isAccA = isAccompanyingTicket(ticketA);
+        const isAccB = isAccompanyingTicket(ticketB);
+        if (!isAccA && isAccB) return -1;
+        if (isAccA && !isAccB) return 1;
+        return 0;
+      });
+  }, [ticketSelections, tickets]);
 
   const isTicketDisabled = (ticket: any) => {
     const status = getTicketDateStatus(ticket, selectedEvent);
@@ -397,12 +427,13 @@ const BookingWizard = () => {
 
   useEffect(() => {
     if (selectedUser && !isFetching) {
-      const nameParts = selectedUser.name?.split(" ") || [];
+      const uName = selectedUser.name || ((selectedUser as any)?.firstName ? `${(selectedUser as any).firstName} ${(selectedUser as any).lastName || ''}`.trim() : '');
+      const nameParts = uName.split(" ") || [];
       setBillingInfo({
-        firstName: nameParts[0] || "",
-        lastName: nameParts.slice(1).join(" ") || "",
+        firstName: nameParts[0] || (selectedUser as any)?.firstName || "",
+        lastName: nameParts.slice(1).join(" ") || (selectedUser as any)?.lastName || "",
         email: selectedUser.email || "",
-        phone: selectedUser.mobile || ""
+        phone: selectedUser.mobile || (selectedUser as any)?.phone || ""
       });
     }
   }, [selectedUser, isFetching]);
@@ -618,26 +649,44 @@ const BookingWizard = () => {
     // Initialize attendees array for Step 2 based on quantity
     let userAssigned = false;
     const newAttendees: any = { ...attendees };
-    Object.keys(ticketSelections).forEach(ticketId => {
+    const userName = selectedUser?.name || 
+      ((selectedUser as any)?.firstName ? `${(selectedUser as any).firstName} ${(selectedUser as any).lastName || ''}`.trim() : '') ||
+      `${billingInfo.firstName} ${billingInfo.lastName}`.trim();
+
+    // Process primary tickets (Member, Non-member, Resident) FIRST, then Accompanying person tickets
+    const sortedIds = Object.keys(ticketSelections)
+      .filter(id => ticketSelections[id] > 0)
+      .sort((a, b) => {
+        const ticketA = tickets.find(t => t._id === a || t.id === a);
+        const ticketB = tickets.find(t => t._id === b || t.id === b);
+        const isAccA = isAccompanyingTicket(ticketA);
+        const isAccB = isAccompanyingTicket(ticketB);
+        if (!isAccA && isAccB) return -1;
+        if (isAccA && !isAccB) return 1;
+        return 0;
+      });
+
+    sortedIds.forEach(ticketId => {
       const qty = ticketSelections[ticketId];
       if (qty <= 0) return;
       const ticket = activeTickets.find(t => t.id === ticketId || t._id === ticketId) || tickets.find(t => t._id === ticketId || t.id === ticketId);
       const isAcc = isAccompanyingTicket(ticket);
 
-      if (!newAttendees[ticketId]) {
-        newAttendees[ticketId] = Array.from({ length: qty }).map((_, i) => {
-          let prefillName = "";
-          if (!isAcc && !userAssigned && i === 0 && selectedUser?.name) {
-            prefillName = selectedUser.name;
-            userAssigned = true;
-          }
-          return { name: prefillName, age: "", date_of_birth: "", relation: "" };
-        });
-      } else if (newAttendees[ticketId].length !== qty) {
-        const existing = newAttendees[ticketId];
-        const updated = Array.from({ length: qty }).map((_, i) => existing[i] || { name: "", age: "", date_of_birth: "", relation: "" });
-        newAttendees[ticketId] = updated;
-      }
+      const existing = newAttendees[ticketId] || [];
+      newAttendees[ticketId] = Array.from({ length: qty }).map((_, i) => {
+        const item = existing[i] || { name: "", relation: "", is_waiver: "no", reason_waiver: "" };
+        let prefillName = item.name || "";
+        if (!isAcc && !userAssigned && (!prefillName || !prefillName.trim()) && userName) {
+          prefillName = userName;
+          userAssigned = true;
+        } else if (!isAcc && prefillName && !userAssigned) {
+          userAssigned = true;
+        }
+        return {
+          ...item,
+          name: prefillName
+        };
+      });
     });
     setAttendees(newAttendees);
     
@@ -645,13 +694,42 @@ const BookingWizard = () => {
   };
 
   const handleAttendeeChange = (ticketId: string, index: number, field: string, value: string) => {
+    const ticket = tickets.find(t => t._id === ticketId || t.id === ticketId);
+    const isAcc = isAccompanyingTicket(ticket);
+
     setAttendees(prev => {
       const updated = [...(prev[ticketId] || [])];
-      const currentItem = { ...(updated[index] || { name: "", age: "", date_of_birth: "", relation: "" }) };
-      if (field === 'date_of_birth') {
-        const computedAge = calculateAgeFromDob(value);
-        currentItem.date_of_birth = value;
-        currentItem.age = computedAge;
+      const currentItem = { ...(updated[index] || { name: "", age: "", relation: "", is_waiver: "no", reason_waiver: "" }) };
+      
+      if (field === 'is_waiver') {
+        const isYes = value === 'yes';
+        const defaultReason = isYes 
+          ? (!isAcc ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`)
+          : '';
+        currentItem.is_waiver = value;
+        currentItem.reason_waiver = isYes ? (currentItem.reason_waiver || defaultReason) : '';
+      } else if (field === 'age') {
+        const ageNum = parseInt(value, 10);
+        currentItem.age = value;
+        if (!isNaN(ageNum)) {
+          if (!isAcc) {
+            if (ageNum >= agedAboveLimit) {
+              currentItem.is_waiver = 'yes';
+              currentItem.reason_waiver = currentItem.reason_waiver || `${agedAboveLimit} & Above`;
+            } else {
+              currentItem.is_waiver = 'no';
+              currentItem.reason_waiver = '';
+            }
+          } else {
+            if (ageNum <= underAgeLimit && ageNum > 0) {
+              currentItem.is_waiver = 'yes';
+              currentItem.reason_waiver = currentItem.reason_waiver || `${underAgeLimit} & Below`;
+            } else {
+              currentItem.is_waiver = 'no';
+              currentItem.reason_waiver = '';
+            }
+          }
+        }
       } else {
         currentItem[field] = value;
       }
@@ -706,25 +784,6 @@ const BookingWizard = () => {
             newErrors[ticketId][idx].name = "Name is required";
             if (!firstErrorFieldId) firstErrorFieldId = `name-${ticketId}-${idx}`;
           }
-
-          if (isAcc) {
-            if (!att.age || !att.age.toString().trim()) {
-              allValid = false;
-              newErrors[ticketId][idx].age = "Age is required";
-              if (!firstErrorFieldId) firstErrorFieldId = `age-${ticketId}-${idx}`;
-            }
-            if (!att.relation || !att.relation.trim()) {
-              allValid = false;
-              newErrors[ticketId][idx].relation = "Relation is required";
-              if (!firstErrorFieldId) firstErrorFieldId = `relation-${ticketId}-${idx}`;
-            }
-          } else {
-            if (!att.date_of_birth || !att.date_of_birth.trim()) {
-              allValid = false;
-              newErrors[ticketId][idx].date_of_birth = "Date of Birth is required";
-              if (!firstErrorFieldId) firstErrorFieldId = `dob-${ticketId}-${idx}`;
-            }
-          }
         });
       }
     });
@@ -753,8 +812,7 @@ const BookingWizard = () => {
     setIsSubmitting(true);
     setShowPaymentModal(false);
 
-    const payloadTickets = Object.keys(ticketSelections)
-      .filter(id => ticketSelections[id] > 0)
+    const payloadTickets = sortedSelectedTicketIds
       .flatMap(id => {
         const ticket = tickets.find(t => t._id === id || t.id === id);
         if (!ticket) return [];
@@ -781,8 +839,8 @@ const BookingWizard = () => {
           groupsMap[key].attendees.push({
             name: attendee.name,
             age: attendee.age || (info.ageNum ? String(info.ageNum) : ""),
-            date_of_birth: attendee.date_of_birth || "",
-            relation: attendee.relation || ""
+            relation: attendee.relation || "",
+            reason_waiver: attendee.reason_waiver || (attendee.is_waiver === 'yes' ? (!info.isAcc ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`) : "")
           });
         }
 
@@ -847,6 +905,15 @@ const BookingWizard = () => {
           status: payload.paymentStatus,
           type: "Event Ticket",
           eventName: selectedEvent?.title,
+          billingInfo: payload.billingInfo,
+          user: {
+            name: `${billingInfo.firstName} ${billingInfo.lastName}`.trim() || selectedUser?.name || ((selectedUser as any)?.firstName ? `${(selectedUser as any).firstName} ${(selectedUser as any).lastName || ''}`.trim() : '') || "",
+            firstName: billingInfo.firstName,
+            lastName: billingInfo.lastName,
+            email: billingInfo.email || selectedUser?.email || "",
+            phone: billingInfo.phone || selectedUser?.mobile || (selectedUser as any)?.phone || "",
+            memberId: selectedUser?.memberId || ""
+          },
           tickets: payloadTickets.map(t => ({
             name: t.ticketName || "Event Ticket",
             quantity: t.quantity,
@@ -1178,25 +1245,28 @@ const BookingWizard = () => {
                   </Card>
 
                   <h6 className="fw-bold mb-3">Attendee Details</h6>
-                  {Object.keys(ticketSelections).map(ticketId => {
-                    const qty = ticketSelections[ticketId];
-                    if (qty <= 0) return null;
-                    const ticket = tickets.find(t => t._id === ticketId || t.id === ticketId);
-                    const isAccompanyingPerson = isAccompanyingTicket(ticket);
+                  {(() => {
+                    let globalAttendeeIndex = 0;
+                    return sortedSelectedTicketIds.map(ticketId => {
+                      const qty = ticketSelections[ticketId];
+                      if (qty <= 0) return null;
+                      const ticket = tickets.find(t => t._id === ticketId || t.id === ticketId);
+                      const isAccompanyingPerson = isAccompanyingTicket(ticket);
 
-                    return Array.from({ length: qty }).map((_, idx) => {
-                      const att = attendees[ticketId]?.[idx];
-                      const info = getTicketInfoForAttendeeItem(ticket, att);
-                      const displayTitle = info.shouldShowAge && att?.age
-                        ? `${info.cleanBase} (Aged ${att.age})`
-                        : info.cleanBase;
+                      return Array.from({ length: qty }).map((_, idx) => {
+                        globalAttendeeIndex++;
+                        const att = attendees[ticketId]?.[idx];
+                        const info = getTicketInfoForAttendeeItem(ticket, att);
+                        const displayTitle = info.shouldShowAge && att?.age
+                          ? `${info.cleanBase} (Aged ${att.age})`
+                          : info.cleanBase;
 
-                      return (
-                        <div key={`${ticketId}-${idx}`} className="mb-4 p-3 border rounded">
-                          <div className="d-flex justify-content-between align-items-center mb-3">
-                            <Form.Label className="fw-medium text-dark mb-0">
-                              Attendee {idx + 1} ({displayTitle})
-                            </Form.Label>
+                        return (
+                          <div key={`${ticketId}-${idx}`} className="mb-4 p-3 border rounded">
+                            <div className="d-flex justify-content-between align-items-center mb-3">
+                              <Form.Label className="fw-medium text-dark mb-0">
+                                Attendee {globalAttendeeIndex} ({displayTitle})
+                              </Form.Label>
                             {info.shouldShowAge && (
                               <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2 py-1 fs-12">
                                 Free Pass
@@ -1206,7 +1276,7 @@ const BookingWizard = () => {
                           <Row>
                             {!isAccompanyingPerson ? (
                               <>
-                                <Col md={7} className="mb-3">
+                                <Col md={6} className="mb-3">
                                   <Form.Label className="text-danger small">* <span className="text-dark">Full Name</span></Form.Label>
                                   <Form.Control 
                                     id={`name-${ticketId}-${idx}`}
@@ -1222,28 +1292,34 @@ const BookingWizard = () => {
                                   />
                                   {attendeeErrors[ticketId]?.[idx]?.name && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].name}</div>}
                                 </Col>
-                                <Col md={5} className="mb-3">
-                                  <Form.Label className="text-danger small">* <span className="text-dark">Date of Birth</span></Form.Label>
-                                  <Form.Control 
-                                    id={`dob-${ticketId}-${idx}`}
-                                    type="date"
-                                    max={todayStr}
-                                    value={attendees[ticketId]?.[idx]?.date_of_birth || ""}
-                                    onChange={e => {
-                                      handleAttendeeChange(ticketId, idx, 'date_of_birth', e.target.value);
-                                      if (attendeeErrors[ticketId]?.[idx]?.date_of_birth) {
-                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], date_of_birth: undefined } } }));
-                                      }
-                                    }}
-                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.date_of_birth}
-                                  />
-                                  {attendeeErrors[ticketId]?.[idx]?.date_of_birth && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].date_of_birth}</div>}
-                                  {attendees[ticketId]?.[idx]?.age && (
-                                    <div className="text-muted small mt-1">
-                                      Calculated Age: <span className="fw-semibold">{attendees[ticketId][idx].age}</span>
-                                    </div>
-                                  )}
+                                <Col md={6} className="mb-3">
+                                  <Form.Label className="small text-dark d-block">Age (Below{agedAboveLimit} | {agedAboveLimit} & Above)</Form.Label>
+                                  <div className="d-flex align-items-center gap-3 pt-2">
+                                    <Form.Check 
+                                      type="radio"
+                                      id={`age-no-${ticketId}-${idx}`}
+                                      name={`age-waiver-${ticketId}-${idx}`}
+                                      label={`Below ${agedAboveLimit}`}
+                                      checked={attendees[ticketId]?.[idx]?.is_waiver !== 'yes'}
+                                      onChange={() => handleAttendeeChange(ticketId, idx, 'is_waiver', 'no')}
+                                    />
+                                    <Form.Check 
+                                      type="radio"
+                                      id={`age-yes-${ticketId}-${idx}`}
+                                      name={`age-waiver-${ticketId}-${idx}`}
+                                      label={`${agedAboveLimit} & Above`}
+                                      checked={attendees[ticketId]?.[idx]?.is_waiver === 'yes'}
+                                      onChange={() => handleAttendeeChange(ticketId, idx, 'is_waiver', 'yes')}
+                                    />
+                                  </div>
                                 </Col>
+                                {aboveAgeNote && (
+                                  <Col md={12} className="mb-2">
+                                    <div className="text-muted small">
+                                      <strong>Note: </strong>{aboveAgeNote}
+                                    </div>
+                                  </Col>
+                                )}
                               </>
                             ) : (
                               <>
@@ -1264,46 +1340,52 @@ const BookingWizard = () => {
                                   {attendeeErrors[ticketId]?.[idx]?.name && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].name}</div>}
                                 </Col>
                                 <Col md={3} className="mb-3">
-                                  <Form.Label className="text-danger small">* <span className="text-dark">Age</span></Form.Label>
-                                  <Form.Control 
-                                    id={`age-${ticketId}-${idx}`}
-                                    type="number"
-                                    min="1"
-                                    placeholder="Age" 
-                                    value={attendees[ticketId]?.[idx]?.age || ""}
-                                    onChange={e => {
-                                      handleAttendeeChange(ticketId, idx, 'age', e.target.value);
-                                      if (attendeeErrors[ticketId]?.[idx]?.age) {
-                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], age: undefined } } }));
-                                      }
-                                    }}
-                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.age}
-                                  />
-                                  {attendeeErrors[ticketId]?.[idx]?.age && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].age}</div>}
-                                </Col>
-                                <Col md={4} className="mb-3">
-                                  <Form.Label className="text-danger small">* <span className="text-dark">Relation</span></Form.Label>
+                                  <Form.Label className="small text-dark">Relation</Form.Label>
                                   <Form.Control 
                                     id={`relation-${ticketId}-${idx}`}
                                     placeholder="e.g. Spouse, Child" 
                                     value={attendees[ticketId]?.[idx]?.relation || ""}
                                     onChange={e => {
                                       handleAttendeeChange(ticketId, idx, 'relation', e.target.value);
-                                      if (attendeeErrors[ticketId]?.[idx]?.relation) {
-                                        setAttendeeErrors((prev: any) => ({ ...prev, [ticketId]: { ...prev[ticketId], [idx]: { ...prev[ticketId]?.[idx], relation: undefined } } }));
-                                      }
                                     }}
-                                    isInvalid={!!attendeeErrors[ticketId]?.[idx]?.relation}
                                   />
-                                  {attendeeErrors[ticketId]?.[idx]?.relation && <div className="text-danger small mt-1">{attendeeErrors[ticketId][idx].relation}</div>}
                                 </Col>
+                                <Col md={4} className="mb-3">
+                                  <Form.Label className="small text-dark d-block">Age (Above  {underAgeLimit} | {underAgeLimit} & Below)</Form.Label>
+                                  <div className="d-flex align-items-center gap-3 pt-2">
+                                    <Form.Check 
+                                      type="radio"
+                                      id={`age-no-${ticketId}-${idx}`}
+                                      name={`age-waiver-${ticketId}-${idx}`}
+                                      label={`Above ${underAgeLimit}`}
+                                      checked={attendees[ticketId]?.[idx]?.is_waiver !== 'yes'}
+                                      onChange={() => handleAttendeeChange(ticketId, idx, 'is_waiver', 'no')}
+                                    />
+                                    <Form.Check 
+                                      type="radio"
+                                      id={`age-yes-${ticketId}-${idx}`}
+                                      name={`age-waiver-${ticketId}-${idx}`}
+                                      label={`${underAgeLimit} & Below`}
+                                      checked={attendees[ticketId]?.[idx]?.is_waiver === 'yes'}
+                                      onChange={() => handleAttendeeChange(ticketId, idx, 'is_waiver', 'yes')}
+                                    />
+                                  </div>
+                                </Col>
+                                {underAgeNote && (
+                                  <Col md={12} className="mb-2">
+                                    <div className="text-muted small">
+                                      <strong>Note: </strong>{underAgeNote}
+                                    </div>
+                                  </Col>
+                                )}
                               </>
                             )}
                           </Row>
                         </div>
                       );
                     });
-                  })}
+                  });
+                })()}
                 </Col>
                 
                 <Col lg={4}>
@@ -1431,7 +1513,18 @@ const BookingWizard = () => {
 
       {downloadingTxn && (
         <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
-          <InvoiceTemplate transaction={downloadingTxn} user={{ name: `${billingInfo.firstName} ${billingInfo.lastName}`.trim() || "", email: billingInfo.email, phone: billingInfo.phone, memberId: selectedUser?.memberId || "" }} id="admin-invoice-template-container" />
+          <InvoiceTemplate 
+            transaction={downloadingTxn} 
+            user={(downloadingTxn as any)?.user || { 
+              name: `${billingInfo.firstName} ${billingInfo.lastName}`.trim() || selectedUser?.name || "", 
+              firstName: billingInfo.firstName,
+              lastName: billingInfo.lastName,
+              email: billingInfo.email || selectedUser?.email || "", 
+              phone: billingInfo.phone || selectedUser?.mobile || (selectedUser as any)?.phone || "", 
+              memberId: selectedUser?.memberId || "" 
+            }} 
+            id="admin-invoice-template-container" 
+          />
         </div>
       )}
 

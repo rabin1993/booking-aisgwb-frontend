@@ -69,8 +69,26 @@ const BookingListContent: React.FC = () => {
   const handleResendInvoice = async (booking: Booking) => {
     setResendingId(booking._id);
     try {
-      // Fetch transaction to get real transactionRef
       const token = typeof window !== "undefined" ? localStorage.getItem('token') || sessionStorage.getItem('token') : null;
+      
+      // Fetch full booking to ensure complete billingInfo & userId
+      let fullBooking = booking;
+      try {
+        const bRes = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/admin/bookings/${booking._id}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          }
+        });
+        if (bRes.ok) {
+          const bData = await bRes.json();
+          if (bData.data) fullBooking = bData.data;
+        }
+      } catch (bErr) {
+        console.warn("Could not fetch full booking details for resend invoice:", bErr);
+      }
+
+      // Fetch transaction to get real transactionRef
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/admin/transactions`, {
         headers: {
           'Content-Type': 'application/json',
@@ -79,19 +97,32 @@ const BookingListContent: React.FC = () => {
       });
       const data = await res.json();
       const allTxns = data.data || [];
-      const matchedTxn = allTxns.find((t: any) => t.bookingId?._id === (booking._id || (booking as any).id) || t.bookingId === (booking._id || (booking as any).id));
+      const matchedTxn = allTxns.find((t: any) => t.bookingId?._id === (fullBooking._id || (fullBooking as any).id) || t.bookingId === (fullBooking._id || (fullBooking as any).id));
       
+      const rawTickets = Array.isArray(fullBooking.tickets) ? fullBooking.tickets : [];
+      const bInfo = fullBooking.billingInfo || {};
+      const uInfo = (fullBooking.userId && typeof fullBooking.userId === 'object') ? fullBooking.userId : {};
+      
+      const resolvedName = [bInfo.firstName, bInfo.lastName].filter(Boolean).join(' ').trim() || 
+        uInfo.name || uInfo.fullName || 
+        [uInfo.firstName, uInfo.lastName].filter(Boolean).join(' ').trim() || 
+        rawTickets[0]?.attendees?.[0]?.name || "";
+      const resolvedEmail = bInfo.email || uInfo.email || "";
+      const resolvedPhone = bInfo.phone || uInfo.mobile || uInfo.phone || "";
+      const resolvedMemberId = uInfo.memberId || (bInfo as any).memberId || "";
+
       const provisionalTxn = {
-        id: booking._id || (booking as any).id,
-        transactionRef: matchedTxn?.transactionRef || (booking as any).transactionRef || "N/A",
-        date: dayjs(booking.createdAt).format('DD MMM YYYY, hh:mm A'),
-        description: `Booking for ${booking.eventId?.title || 'Event'}`,
-        paymentMethod: booking.paymentMethod || "N/A",
-        amount: `₹ ${booking.totalAmount}`,
-        status: booking.paymentStatus,
+        id: fullBooking._id || (fullBooking as any).id,
+        transactionRef: matchedTxn?.transactionRef || (fullBooking as any).transactionRef || "N/A",
+        date: dayjs(fullBooking.createdAt).format('DD MMM YYYY, hh:mm A'),
+        description: `Booking for ${fullBooking.eventId?.title || 'Event'}`,
+        paymentMethod: fullBooking.paymentMethod || "N/A",
+        amount: `₹ ${fullBooking.totalAmount}`,
+        status: fullBooking.paymentStatus,
         type: "Event",
-        eventName: booking.eventId?.title || 'Event',
-        tickets: booking.tickets.flatMap((t: any) => {
+        eventName: fullBooking.eventId?.title || 'Event',
+        billingInfo: fullBooking.billingInfo,
+        tickets: rawTickets.flatMap((t: any) => {
           const attList = Array.isArray(t?.attendees) ? t.attendees : [];
           const regularAttendees = attList.filter((a: any) => !(t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
           const freeAttendees = attList.filter((a: any) => (t.ticketName && (t.ticketName.includes('(Under') || t.ticketName.includes('(Aged'))));
@@ -122,13 +153,15 @@ const BookingListContent: React.FC = () => {
           }
           return items;
         }),
-        quantity: booking.tickets.reduce((sum, t) => sum + t.quantity, 0),
-        unitPrice: `₹ ${booking.totalAmount}`,
+        quantity: rawTickets.reduce((sum: number, t: any) => sum + (t.quantity || 0), 0),
+        unitPrice: `₹ ${fullBooking.totalAmount}`,
         user: {
-          name: `${booking.billingInfo?.firstName || ""} ${booking.billingInfo?.lastName || ""}`.trim() || (booking.userId as any)?.name || (booking.userId as any)?.fullName || "",
-          email: booking.billingInfo?.email || (booking.userId as any)?.email,
-          phone: booking.billingInfo?.phone || (booking.userId as any)?.mobile || (booking.userId as any)?.phone,
-          memberId: (booking.userId as any)?.memberId || ""
+          name: resolvedName,
+          firstName: bInfo.firstName || uInfo.firstName || "",
+          lastName: bInfo.lastName || uInfo.lastName || "",
+          email: resolvedEmail,
+          phone: resolvedPhone,
+          memberId: resolvedMemberId
         }
       };
 
@@ -591,12 +624,7 @@ const BookingListContent: React.FC = () => {
         <div style={{ position: "absolute", top: "-9999px", left: "-9999px" }}>
           <InvoiceTemplate 
             transaction={downloadingTxn} 
-            user={downloadingTxn.user || { 
-              name: `${selectedBooking?.billingInfo?.firstName || ""} ${selectedBooking?.billingInfo?.lastName || ""}`.trim() || (selectedBooking?.userId as any)?.name || "", 
-              email: selectedBooking?.billingInfo?.email || (selectedBooking?.userId as any)?.email, 
-              phone: selectedBooking?.billingInfo?.phone || (selectedBooking?.userId as any)?.mobile || (selectedBooking?.userId as any)?.phone,
-              memberId: (selectedBooking?.userId as any)?.memberId || ""
-            }} 
+            user={downloadingTxn.user} 
             id={`admin-booking-list-invoice-template-${downloadingTxn.id}`} 
           />
         </div>

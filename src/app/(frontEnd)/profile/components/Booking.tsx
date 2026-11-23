@@ -343,7 +343,6 @@ const Booking = () => {
                     <th className="fw-semibold border-0">Name</th>
                     <th className="fw-semibold border-0">Ticket</th>
                     <th className="fw-semibold border-0 text-center">Ticket Status</th>
-                    <th className="fw-semibold border-0 text-center">QR Code</th>
                     <th className="fw-semibold border-0 text-center rounded-end">Actions</th>
                   </tr>
                 </thead>
@@ -367,21 +366,10 @@ const Booking = () => {
                             </span>
                           </td>
                           <td className="text-center">
-                            <Image
-                              src={`https://api.qrserver.com/v1/create-qr-code/?size=64x64&data=${encodeURIComponent(
-                                `${typeof window !== 'undefined' ? window.location.origin : (process.env.NEXT_PUBLIC_BASE_URL || 'http://localhost:3000')}/admin/attendees/scanner?eventId=${typeof selectedTicket?.rawBooking?.eventId === 'string' ? selectedTicket.rawBooking.eventId : (selectedTicket?.rawBooking?.eventId?._id || selectedTicket?.rawBooking?.eventId?.id || '')}&attendeeId=${a.attendeeRecordId || a._id || a.id || ''}&ticketId=${typeof t.ticketId === 'string' ? t.ticketId : (t.ticketId?._id || t.ticketId?.id || '')}`
-                              )}`}
-                              alt="QR Code"
-                              width="64"
-                              height="64"
-                              className="border rounded p-1 shadow-sm"
-                            />
-                          </td>
-                          <td className="text-center">
                             {!isUsed && (
                               <OverlayTrigger
                                 placement="top"
-                                overlay={<Tooltip id={`tooltip-ticket-${a._id || a.id}`}>View Ticket PDF</Tooltip>}
+                                overlay={<Tooltip id={`tooltip-ticket-${a._id || a.id}`}>Download Pass</Tooltip>}
                               >
                                 <button
                                   className="btn btn-sm btn-light text-primary border rounded"
@@ -391,7 +379,7 @@ const Booking = () => {
                                   {isDownloading === (a.attendeeRecordId || a._id) ? (
                                     <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                   ) : (
-                                    <IconifyIcon icon="lucide:eye" width="16" />
+                                    <IconifyIcon icon="lucide:download" width="16" />
                                   )}
                                 </button>
                               </OverlayTrigger>

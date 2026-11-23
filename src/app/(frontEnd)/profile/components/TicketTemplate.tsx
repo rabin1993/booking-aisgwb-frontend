@@ -81,9 +81,26 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
     attendee?.ticketName?.toLowerCase().includes('accompany') ||
     attendee?.isPrimary === false
   );
-  const isUnderAge = isAccompanying && !isNaN(ageNum) && ageNum <= underAgeLimit;
-  const isAboveAge = !isAccompanying && !isNaN(ageNum) && ageNum >= agedAboveLimit;
+  const isUnderAge = isAccompanying && ((!isNaN(ageNum) && ageNum <= underAgeLimit) || attendee?.is_waiver === 'yes' || attendee?.reason_waiver?.includes('Below') || attendee?.ticketName?.includes('Below') || attendee?.ticketName?.includes('Under'));
+  const isAboveAge = !isAccompanying && ((!isNaN(ageNum) && ageNum >= agedAboveLimit) || attendee?.is_waiver === 'yes' || attendee?.reason_waiver?.includes('Above') || attendee?.ticketName?.includes('Above') || attendee?.ticketName?.includes('Aged'));
   const shouldShowAgeInType = isUnderAge || isAboveAge;
+
+  const isWaiver = Boolean(
+    attendee?.is_waiver === 'yes' ||
+    attendee?.reason_waiver ||
+    (attendee?.ticketPrice == 0 && (isUnderAge || isAboveAge || attendee?.ticketName?.includes('Aged') || attendee?.ticketName?.includes('Under') || attendee?.ticketName?.includes('Above') || attendee?.ticketName?.includes('Below')))
+  );
+
+  let reasonWaiverValue = '';
+  if (isWaiver) {
+    if (attendee?.reason_waiver && !attendee.reason_waiver.toLowerCase().includes('waiver')) {
+      reasonWaiverValue = attendee.reason_waiver;
+    } else if (!isAccompanying) {
+      reasonWaiverValue = `${agedAboveLimit} & Above`;
+    } else {
+      reasonWaiverValue = `${underAgeLimit} & Below`;
+    }
+  }
 
   const cleanBase = (attendee?.ticketName || '').replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
   const effectiveAge = attendee?.age || (!isNaN(ageNum) ? String(ageNum) : '');
@@ -91,19 +108,6 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
     ? `${cleanBase} (Aged ${effectiveAge})`
     : cleanBase;
   const isFree = attendee?.ticketPrice == 0 || !attendee?.ticketPrice || shouldShowAgeInType;
-
-  let dobFormatted = 'N/A';
-  if (attendee?.date_of_birth) {
-    const parts = String(attendee.date_of_birth).split('-');
-    if (parts.length === 3) {
-      dobFormatted = `${parts[2]}-${parts[1]}-${parts[0]}`; // DD-MM-YYYY
-    } else {
-      dobFormatted = String(attendee.date_of_birth);
-    }
-  } else if (isAboveAge && !isNaN(ageNum)) {
-    const approxYear = new Date().getFullYear() - ageNum;
-    dobFormatted = `01-01-${approxYear}`;
-  }
 
   return (
     <div 
@@ -140,7 +144,7 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
             </div>
             <div className="detail-item">
               <span className="detail-label">PAYMENT STATUS :</span>
-              <span className="detail-value">{attendee.paymentStatus || ''}</span>
+              <span className="detail-value">{attendee.paymentStatus || (isFree ? 'Free' : 'Success')}</span>
             </div>
             <div className="detail-item">
               <span className="detail-label">ATTENDEE :</span>
@@ -156,37 +160,21 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
               <span className="detail-label">PRICE :</span>
               <span className="detail-value">{isFree ? "FREE" : `₹ ${attendee.ticketPrice}`}</span>
             </div>
+            {Boolean(reasonWaiverValue && reasonWaiverValue.trim() !== '' && reasonWaiverValue !== 'N/A') && (
+              <div className="detail-item">
+                <span className="detail-label">REASON WAIVER :</span>
+                <span className="detail-value">{reasonWaiverValue}</span>
+              </div>
+            )}
+            
             <div className="detail-item">
               <span className="detail-label">STATUS :</span>
-              <span className="detail-value">{attendee.ticketStatus || ''}</span>
+              <span className="detail-value">{attendee.ticketStatus || 'Unused'}</span>
             </div>
-            {isAboveAge ? (
-              <div className="detail-item">
-                <span className="detail-label">DATE OF BIRTH :</span>
-                <span className="detail-value">{dobFormatted}</span>
-              </div>
-            ) : isUnderAge && effectiveAge ? (
-              <>
-                <div className="detail-item">
-                  <span className="detail-label">AGE :</span>
-                  <span className="detail-value">{effectiveAge}</span>
-                </div>
-                {attendee?.relation && (
-                  <div className="detail-item">
-                    <span className="detail-label">RELATION :</span>
-                    <span className="detail-value">{attendee.relation}</span>
-                  </div>
-                )}
-              </>
-            ) : attendee?.relation ? (
+            {attendee?.relation && (
               <div className="detail-item">
                 <span className="detail-label">RELATION :</span>
                 <span className="detail-value">{attendee.relation}</span>
-              </div>
-            ) : (
-              <div className="detail-item" style={{ visibility: 'hidden' }}>
-                <span className="detail-label">-</span>
-                <span className="detail-value">-</span>
               </div>
             )}
           </div>

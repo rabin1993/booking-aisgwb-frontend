@@ -34,14 +34,62 @@ interface InvoiceTemplateProps {
 export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, user, id }) => {
   const { setting } = useSettingsContext();
 
-  const effectiveUser = (user && (user.name || user.email || user.phone || user.firstName)) 
-    ? user 
-    : ((transaction as any)?.user || user || {});
+  // Comprehensive extraction of booked by customer details
+  const candidateUsers = [
+    user,
+    user?.billingInfo,
+    user?.user,
+    (transaction as any)?.user,
+    (transaction as any)?.billingInfo,
+    (transaction as any)?.bookingId?.billingInfo,
+    (transaction as any)?.bookingId?.userId,
+    (transaction as any)?.booking?.billingInfo,
+    (transaction as any)?.booking?.userId,
+  ].filter(Boolean);
 
-  const displayName = effectiveUser?.name || effectiveUser?.fullName || 
-    `${effectiveUser?.firstName || ''} ${effectiveUser?.lastName || ''}`.trim() || '';
-  const displayEmail = effectiveUser?.email || 'N/A';
-  const displayPhone = effectiveUser?.phone || effectiveUser?.mobile || 'N/A';
+  let displayName = '';
+  for (const u of candidateUsers) {
+    const name = u?.name || u?.fullName || `${u?.firstName || ''} ${u?.lastName || ''}`.trim();
+    if (name && name.toLowerCase() !== 'undefined undefined' && name.toLowerCase() !== 'unknown' && name.toLowerCase() !== 'guest') {
+      displayName = name;
+      break;
+    }
+  }
+  if (!displayName) {
+    for (const u of candidateUsers) {
+      const name = u?.name || u?.fullName || `${u?.firstName || ''} ${u?.lastName || ''}`.trim();
+      if (name && name.toLowerCase() !== 'undefined undefined') {
+        displayName = name;
+        break;
+      }
+    }
+  }
+  if (!displayName) {
+    const rawTickets = transaction?.tickets || (transaction as any)?.bookingId?.tickets || (transaction as any)?.booking?.tickets;
+    const firstTicket = Array.isArray(rawTickets) ? rawTickets[0] : null;
+    const firstAtt = firstTicket?.attendees?.[0];
+    if (firstAtt?.name) {
+      displayName = firstAtt.name;
+    }
+  }
+
+  let displayEmail = 'N/A';
+  for (const u of candidateUsers) {
+    const email = u?.email || u?.mail;
+    if (email && email !== 'N/A') {
+      displayEmail = email;
+      break;
+    }
+  }
+
+  let displayPhone = 'N/A';
+  for (const u of candidateUsers) {
+    const phone = u?.phone || u?.mobile || u?.contact;
+    if (phone && phone !== 'N/A') {
+      displayPhone = phone;
+      break;
+    }
+  }
 
   return (
     <div id={id || "invoice-template-container"} style={{ width: '800px', padding: '40px', backgroundColor: '#fff', color: '#333', fontFamily: 'sans-serif' }}>
@@ -68,9 +116,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, u
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px' }}>
         <div>
           <p style={{ margin: 0, fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', marginBottom: '8px' }}>Booked By</p>
-          {displayName && (
-            <p style={{ margin: 0, fontWeight: 'bold', color: '#1f2937', marginBottom: '4px' }}>{displayName}</p>
-          )}
+          <p style={{ margin: 0, fontWeight: 'bold', color: '#1f2937', marginBottom: '4px' }}>{displayName || 'N/A'}</p>
           <p style={{ margin: 0, color: '#6b7280', fontSize: '14px', marginBottom: '2px' }}>Email: {displayEmail}</p>
           <p style={{ margin: 0, color: '#6b7280', fontSize: '14px' }}>Phone: {displayPhone}</p>
         </div>

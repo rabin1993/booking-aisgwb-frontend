@@ -81,6 +81,13 @@ const Transactions = () => {
     const qty = mappedTickets.length > 0 ? mappedTickets.reduce((sum, item) => sum + item.quantity, 0) : (t.quantity || 1);
     const unitPrice = qty > 0 ? (rawAmount / qty).toFixed(2) : rawAmount.toFixed(2);
 
+    const bInfo = booking?.billingInfo || {};
+    const uInfo = (t.userId && typeof t.userId === 'object') ? t.userId : (user || {});
+    const resolvedName = [bInfo.firstName, bInfo.lastName].filter(Boolean).join(' ').trim() ||
+      uInfo.name || uInfo.fullName || [uInfo.firstName, uInfo.lastName].filter(Boolean).join(' ').trim() || "";
+    const resolvedEmail = bInfo.email || uInfo.email || "";
+    const resolvedPhone = bInfo.phone || uInfo.mobile || uInfo.phone || "";
+
     return {
       id: t.transactionRef || t._id,
       transactionRef: t.transactionRef,
@@ -94,6 +101,13 @@ const Transactions = () => {
       tickets: mappedTickets,
       quantity: qty,
       unitPrice: `₹ ${unitPrice}`,
+      billingInfo: booking?.billingInfo,
+      user: {
+        name: resolvedName,
+        email: resolvedEmail,
+        phone: resolvedPhone,
+        memberId: uInfo.memberId || ""
+      }
     };
   });
 
@@ -257,7 +271,7 @@ const Transactions = () => {
 
       {downloadingTxn && (
         <div style={{ position: "absolute", left: "-9999px", top: "-9999px" }}>
-          <InvoiceTemplate transaction={downloadingTxn} user={user} />
+          <InvoiceTemplate transaction={downloadingTxn} user={(downloadingTxn as any)?.user || user} />
         </div>
       )}
     </div>

@@ -341,10 +341,13 @@ const AttendeeListContent: React.FC = () => {
             }),
             quantity: rawTickets.reduce((sum: number, t: any) => sum + (t.quantity || 0), 0),
             unitPrice: `₹ ${fullBooking.totalAmount}`,
+            billingInfo: fullBooking.billingInfo,
             user: { 
-              name: `${fullBooking.billingInfo?.firstName || ""} ${fullBooking.billingInfo?.lastName || ""}`.trim() || "", 
-              email: fullBooking.billingInfo?.email, 
-              phone: fullBooking.billingInfo?.phone,
+              name: `${fullBooking.billingInfo?.firstName || ""} ${fullBooking.billingInfo?.lastName || ""}`.trim() || fullBooking.userId?.name || fullBooking.userId?.fullName || "", 
+              firstName: fullBooking.billingInfo?.firstName || fullBooking.userId?.firstName || "",
+              lastName: fullBooking.billingInfo?.lastName || fullBooking.userId?.lastName || "",
+              email: fullBooking.billingInfo?.email || fullBooking.userId?.email || attendee.email || "", 
+              phone: fullBooking.billingInfo?.phone || fullBooking.userId?.mobile || fullBooking.userId?.phone || "",
               memberId: fullBooking.userId?.memberId || ""
             }
           };
@@ -931,12 +934,7 @@ const AttendeeListContent: React.FC = () => {
         <div style={{ position: "fixed", top: 0, left: 0, width: "800px", opacity: 0, pointerEvents: "none", zIndex: -9999 }}>
           <InvoiceTemplate 
             transaction={downloadingTxn} 
-            user={{ 
-              name: downloadingTxn.user?.name || "", 
-              email: downloadingTxn.user?.email, 
-              phone: downloadingTxn.user?.phone,
-              memberId: downloadingTxn.user?.memberId || ""
-            }} 
+            user={downloadingTxn.user} 
             id={`admin-booking-invoice-template-${resendingAttendee?._id || resendingAttendee?.id}`} 
           />
         </div>

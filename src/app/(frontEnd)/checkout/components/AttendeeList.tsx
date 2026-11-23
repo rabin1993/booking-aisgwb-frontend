@@ -13,6 +13,8 @@ export interface Attendee {
     relation: string;
     ticketName?: string;
     isPrimary?: boolean;
+    is_waiver?: 'yes' | 'no';
+    reason_waiver?: string;
 }
 
 interface AttendeeListProps {
@@ -58,8 +60,9 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
 }) => {
     const { setting } = useSettingsContext();
     const underAgeLimit = parseInt(setting('general.under_age', '10')) || 10;
+    const underAgeNote = setting('general.under_age_note') || setting('under_age_note') || '';
     const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
-    const todayStr = new Date().toISOString().split("T")[0];
+    const aboveAgeNote = setting('general.aged_above_note') || setting('aged_above_note') || '';
 
     return (
         <div className="col-lg-8">
@@ -73,27 +76,19 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
             <div className="d-flex flex-column gap-4">
                 {attendees.map((attendee, index) => {
                     const cleanBase = (attendee.ticketName || '').replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
-                    const ageNum = parseInt(attendee.age);
-                    const isUnderAge = attendee.isPrimary === false && !isNaN(ageNum) && ageNum <= underAgeLimit;
-                    const isAboveAge = attendee.isPrimary !== false && !isNaN(ageNum) && ageNum >= agedAboveLimit;
-                    const shouldShowAge = isUnderAge || isAboveAge;
-
-                    const displayTicketName = shouldShowAge && attendee.age
-                        ? `${cleanBase}`
-                        : cleanBase;
 
                     return (
                         <div key={attendee.id} className="card border-0 shadow-sm rounded-4 overflow-hidden">
                             <div className="card-header bg-white border-bottom pb-3 pt-4 px-4 d-flex justify-content-between align-items-center">
-                                <div className="d-flex align-items-center gap-2">
+                                <div className="d-flex align-items-center gap-2 flex-wrap">
                                     <div className="bg-primary bg-opacity-10 text-primary rounded-circle d-flex align-items-center justify-content-center fw-bold" style={{ width: '32px', height: '32px' }}>
                                         {index + 1}
                                     </div>
                                     <h5 className="fs-5 fw-bold text-dark mb-0 d-flex align-items-center flex-wrap gap-2">
                                         Attendee Details
-                                        {displayTicketName && (
+                                        {cleanBase && (
                                             <span className="badge bg-primary bg-opacity-10 text-primary border border-primary-subtle rounded-pill fs-sm fw-medium px-3 py-1">
-                                                {displayTicketName}
+                                                {cleanBase}
                                             </span>
                                         )}
                                     </h5>
@@ -138,38 +133,45 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                                 )}
                                             </div>
                                             <div className="col-md-4">
-                                                <label className="form-label fw-semibold">
-                                                    Date of Birth <span className="text-danger">*</span>
-                                                </label>
-                                                <input
-                                                    id={`attendee-dob-${attendee.id}`}
-                                                    type="date"
-                                                    max={todayStr}
-                                                    className={`form-control ${invalidAttendeeIds.includes(attendee.id) && !attendee.date_of_birth ? 'is-invalid border-danger' : ''}`}
-                                                    value={attendee.date_of_birth || ''}
-                                                    onChange={(e) => onChangeAttendee(attendee.id, 'date_of_birth', e.target.value)}
-                                                    required
-                                                />
-                                                {invalidAttendeeIds.includes(attendee.id) && !attendee.date_of_birth && (
-                                                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                                                        <IconifyIcon icon="lucide:alert-circle" width="14" />
-                                                        Date of Birth is required
+                                                <label className="form-label fw-semibold d-block">Age (Below {agedAboveLimit} | {agedAboveLimit} & Above)</label>
+                                                <div className="d-flex align-items-center gap-3 pt-2">
+                                                    <div className="form-check">
+                                                        <input
+                                                            className="form-check-input cursor-pointer"
+                                                            type="radio"
+                                                            name={`age-waiver-${attendee.id}`}
+                                                            id={`age-no-${attendee.id}`}
+                                                            value="no"
+                                                            checked={attendee.is_waiver !== 'yes'}
+                                                            onChange={() => onChangeAttendee(attendee.id, 'is_waiver', 'no')}
+                                                        />
+                                                        <label className="form-check-label fw-medium cursor-pointer" htmlFor={`age-no-${attendee.id}`}>
+                                                            Below {agedAboveLimit}
+                                                        </label>
                                                     </div>
-                                                )}
+                                                    <div className="form-check">
+                                                        <input
+                                                            className="form-check-input cursor-pointer"
+                                                            type="radio"
+                                                            name={`age-waiver-${attendee.id}`}
+                                                            id={`age-yes-${attendee.id}`}
+                                                            value="yes"
+                                                            checked={attendee.is_waiver === 'yes'}
+                                                            onChange={() => onChangeAttendee(attendee.id, 'is_waiver', 'yes')}
+                                                        />
+                                                        <label className="form-check-label fw-medium cursor-pointer" htmlFor={`age-yes-${attendee.id}`}>
+                                                            {agedAboveLimit} & Above
+                                                        </label>
+                                                    </div>
+                                                </div>
                                             </div>
-                                            {/* <div className="col-md-3">
-                                                <label className="form-label fw-semibold">
-                                                    Age
-                                                </label>
-                                                <input
-                                                    type="text"
-                                                    className="form-control bg-light"
-                                                    value={attendee.age || ''}
-                                                    placeholder="Auto-calculated"
-                                                    readOnly
-                                                    disabled
-                                                />
-                                            </div> */}
+                                            {aboveAgeNote && (
+                                                <div className="col-12 mt-1">
+                                                    <p className="small text-muted mb-0">
+                                                        <strong className="text-dark">Note: </strong>{aboveAgeNote}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </>
                                     ) : (
                                         <>
@@ -194,51 +196,56 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                                 )}
                                             </div>
                                             <div className="col-md-3">
-                                                <label className="form-label fw-semibold">Age <span className="text-danger">*</span></label>
-                                                <input
-                                                    id={`attendee-age-${attendee.id}`}
-                                                    type="number"
-                                                    className={`form-control ${invalidAttendeeIds.includes(attendee.id) && !attendee.age?.trim() ? 'is-invalid border-danger' : ''}`}
-                                                    value={attendee.age}
-                                                    onChange={(e) => {
-                                                        const val = e.target.value.replace(/[^0-9]/g, '');
-                                                        onChangeAttendee(attendee.id, 'age', val);
-                                                    }}
-                                                    onKeyDown={(e) => {
-                                                        if (['.', 'e', 'E', '+', '-'].includes(e.key)) {
-                                                            e.preventDefault();
-                                                        }
-                                                    }}
-                                                    min="1"
-                                                    max="120"
-                                                    placeholder="1"
-                                                    required
-                                                />
-                                                {invalidAttendeeIds.includes(attendee.id) && !attendee.age?.trim() && (
-                                                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                                                        <IconifyIcon icon="lucide:alert-circle" width="14" />
-                                                        Age is required
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="col-md-4">
-                                                <label className="form-label fw-semibold">Relation <span className="text-danger">*</span></label>
+                                                <label className="form-label fw-semibold">Relation</label>
                                                 <input
                                                     id={`attendee-relation-${attendee.id}`}
                                                     type="text"
-                                                    className={`form-control ${invalidAttendeeIds.includes(attendee.id) && !attendee.relation?.trim() ? 'is-invalid border-danger' : ''}`}
-                                                    value={attendee.relation}
+                                                    className="form-control"
+                                                    value={attendee.relation || ''}
                                                     onChange={(e) => onChangeAttendee(attendee.id, 'relation', e.target.value)}
                                                     placeholder="e.g. Spouse, Child"
-                                                    required
                                                 />
-                                                {invalidAttendeeIds.includes(attendee.id) && !attendee.relation?.trim() && (
-                                                    <div className="text-danger small mt-1 d-flex align-items-center gap-1">
-                                                        <IconifyIcon icon="lucide:alert-circle" width="14" />
-                                                        Relation is required
-                                                    </div>
-                                                )}
                                             </div>
+                                            <div className="col-md-4">
+                                                <label className="form-label fw-semibold d-block">Age (Above {underAgeLimit} | {underAgeLimit} & Below)</label>
+                                                <div className="d-flex align-items-center gap-3 pt-2">
+                                                    <div className="form-check">
+                                                        <input
+                                                            className="form-check-input cursor-pointer"
+                                                            type="radio"
+                                                            name={`age-waiver-${attendee.id}`}
+                                                            id={`age-no-${attendee.id}`}
+                                                            value="no"
+                                                            checked={attendee.is_waiver !== 'yes'}
+                                                            onChange={() => onChangeAttendee(attendee.id, 'is_waiver', 'no')}
+                                                        />
+                                                        <label className="form-check-label fw-medium cursor-pointer" htmlFor={`age-no-${attendee.id}`}>
+                                                            Above {underAgeLimit}
+                                                        </label>
+                                                    </div>
+                                                    <div className="form-check">
+                                                        <input
+                                                            className="form-check-input cursor-pointer"
+                                                            type="radio"
+                                                            name={`age-waiver-${attendee.id}`}
+                                                            id={`age-yes-${attendee.id}`}
+                                                            value="yes"
+                                                            checked={attendee.is_waiver === 'yes'}
+                                                            onChange={() => onChangeAttendee(attendee.id, 'is_waiver', 'yes')}
+                                                        />
+                                                        <label className="form-check-label fw-medium cursor-pointer" htmlFor={`age-yes-${attendee.id}`}>
+                                                            {underAgeLimit} & Below
+                                                        </label>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            {underAgeNote && (
+                                                <div className="col-12 mt-1">
+                                                    <p className="small text-muted mb-0">
+                                                        <strong className="text-dark">Note: </strong>{underAgeNote}
+                                                    </p>
+                                                </div>
+                                            )}
                                         </>
                                     )}
                                 </div>
