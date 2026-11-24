@@ -107,6 +107,10 @@ const Booking = () => {
     const bId = (b._id || b.id)?.toString();
     const enrichedTickets = (b.tickets || []).map((t: any) => {
       const tTicketId = (t.ticketId?._id || t.ticketId?.id || t.ticketId)?.toString();
+      const isAccTicket = Boolean(
+        t.ticketName?.toLowerCase().includes('accompany') ||
+        t.ticketId?.ticketName?.toLowerCase().includes('accompany')
+      );
       const enrichedAttendees = (t.attendees || []).map((a: any) => {
         const aId = (a._id || a.id)?.toString();
         const aName = a.name?.trim().toLowerCase();
@@ -124,6 +128,9 @@ const Booking = () => {
         });
 
         const ticketStatus = a.ticketStatus || matched?.ticketStatus || "Unused";
+        const isPrimaryAttendee = a.isPrimary !== undefined 
+          ? Boolean(a.isPrimary) 
+          : (matched?.isPrimary !== undefined ? Boolean(matched.isPrimary) : (!isAccTicket && (!a.relation || a.relation.toLowerCase() === 'self')));
 
         return {
           ...a,
@@ -133,6 +140,7 @@ const Booking = () => {
           ticketStatus,
           status: ticketStatus,
           attendeeRecordId: matched?._id || a._id,
+          isPrimary: isPrimaryAttendee,
         };
       });
 

@@ -77,9 +77,11 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
   }
 
   const isAccompanying = Boolean(
-    attendee?.relation ||
+    (attendee?.relation && attendee?.relation.trim().toLowerCase() !== 'self') ||
     attendee?.ticketName?.toLowerCase().includes('accompany') ||
-    attendee?.isPrimary === false
+    attendee?.passType === 'Accompanying' ||
+    attendee?.isPrimary === false ||
+    attendee?.isPrimary === 'false'
   );
   const isUnderAge = isAccompanying && ((!isNaN(ageNum) && ageNum <= underAgeLimit) || attendee?.is_waiver === 'yes' || attendee?.reason_waiver?.includes('Below') || attendee?.ticketName?.includes('Below') || attendee?.ticketName?.includes('Under'));
   const isAboveAge = !isAccompanying && ((!isNaN(ageNum) && ageNum >= agedAboveLimit) || attendee?.is_waiver === 'yes' || attendee?.reason_waiver?.includes('Above') || attendee?.ticketName?.includes('Above') || attendee?.ticketName?.includes('Aged'));
@@ -108,6 +110,15 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
     ? `${cleanBase} (Aged ${effectiveAge})`
     : cleanBase;
   const isFree = attendee?.ticketPrice == 0 || !attendee?.ticketPrice || shouldShowAgeInType;
+
+  const isPrimary = Boolean(
+    attendee?.isPrimary === true ||
+    attendee?.isPrimary === 'true' ||
+    (attendee?.relation && attendee?.relation.trim().toLowerCase() === 'self') ||
+    !isAccompanying
+  );
+
+  const displayRelation = isPrimary ? 'Self' : (attendee?.relation || '');
 
   return (
     <div 
@@ -166,19 +177,12 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
                 <span className="detail-value">{reasonWaiverValue}</span>
               </div>
             )}
-            {attendee?.relation && isAccompanying && (
+            {displayRelation && (
               <div className="detail-item">
                 <span className="detail-label">RELATION :</span>
-                <span className="detail-value">{attendee.relation}</span>
+                <span className="detail-value">{displayRelation}</span>
               </div>
             )}
-
-            {!isAccompanying && (
-              <div className="detail-item">
-                <span className="detail-label">RELATION :</span>
-                <span className="detail-value">Self</span>
-              </div>
-            )}            
             <div className="detail-item">
               <span className="detail-label">STATUS :</span>
               <span className="detail-value">{attendee.ticketStatus || 'Unused'}</span>
