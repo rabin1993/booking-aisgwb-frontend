@@ -63,7 +63,7 @@ const AttendeeViewModal: React.FC<AttendeeViewModalProps> = ({
 
   const effectiveAge = attendee.age || (!isNaN(ageNum) ? String(ageNum) : '');
   const safeTicketName = shouldShowAge && effectiveAge
-    ? `${cleanBase || 'Event Ticket'} (Aged ${effectiveAge})`
+    ? `${cleanBase || 'Event Pass'} (Aged ${effectiveAge})`
     : (cleanBase || 'N/A');
 
   const eventIdStr = typeof attendee.eventId === 'string' 
@@ -75,7 +75,7 @@ const AttendeeViewModal: React.FC<AttendeeViewModalProps> = ({
 
   const handleDownloadTicket = async () => {
     if (isUsed) {
-      toast.error("This ticket has already been used and cannot be downloaded.");
+      toast.error("This pass has already been used and cannot be downloaded.");
       return;
     }
 
@@ -109,13 +109,13 @@ const AttendeeViewModal: React.FC<AttendeeViewModalProps> = ({
           const tPdfHeight = (tCanvas.height * tPdfWidth) / tCanvas.width;
           tPdf.addImage(tImgData, "PNG", 0, 0, tPdfWidth, tPdfHeight);
           tPdf.save(`ticket-${attendee._id || attendee.id}.pdf`);
-          toast.success("Ticket downloaded successfully!");
+          toast.success("Pass downloaded successfully!");
         } else {
           toast.error("Could not generate PDF. Template not found.");
         }
       } catch (error: any) {
-        console.error("Ticket PDF generation error", error);
-        toast.error("Failed to generate ticket PDF");
+        console.error("Pass PDF generation error", error);
+        toast.error("Failed to generate pass PDF");
       } finally {
         setIsDownloading(false);
       }
@@ -138,7 +138,7 @@ const AttendeeViewModal: React.FC<AttendeeViewModalProps> = ({
 
           <Row className="text-start mb-2 px-3">
             <Col xs={6}>
-              <div className="text-muted small mb-1">Ticket ID:</div>
+              <div className="text-muted small mb-1">Pass ID:</div>
               <div className="fw-medium text-dark mb-3">
                 {(attendee._id || attendee.id)?.slice(-10) || "N/A"}
               </div>
@@ -147,7 +147,7 @@ const AttendeeViewModal: React.FC<AttendeeViewModalProps> = ({
               <div className="fw-medium text-dark mb-3">{attendee.name}</div>
             </Col>
             <Col xs={6}>
-              <div className="text-muted small mb-1">Ticket Name:</div>
+              <div className="text-muted small mb-1">Pass For:</div>
               <div className="fw-medium text-dark mb-3">
                 {safeTicketName}
               </div>
@@ -181,7 +181,7 @@ const AttendeeViewModal: React.FC<AttendeeViewModalProps> = ({
             </Button>
           ) : (
             <Badge bg="primary-subtle" text="primary" className="px-3 py-2 fs-13 rounded-pill fw-semibold mt-2">
-              Ticket Used
+              Pass Used
             </Badge>
           )}
         </Modal.Body>
@@ -192,7 +192,7 @@ const AttendeeViewModal: React.FC<AttendeeViewModalProps> = ({
           <TicketTemplate 
             attendee={{
               ...attendee,
-              ticketName: safeTicketName !== "N/A" ? safeTicketName : 'Event Ticket',
+              ticketName: safeTicketName !== "N/A" ? safeTicketName : 'Event Pass',
               ticketPrice: attendee.ticketPrice || 0,
               paymentStatus: attendee.paymentStatus || attendee.bookingId?.paymentStatus || 'Completed',
               ticketStatus: attendee.status || attendee.ticketStatus || 'Unused',

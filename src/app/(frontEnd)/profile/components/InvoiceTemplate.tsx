@@ -136,7 +136,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, u
         <thead>
           <tr style={{ borderBottom: '1px solid #e5e7eb' }}>
             <th style={{ textAlign: 'left', padding: '12px 0', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', width: '10%' }}>#</th>
-            <th style={{ textAlign: 'left', padding: '12px 0', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', width: '40%' }}>Ticket Name</th>
+            <th style={{ textAlign: 'left', padding: '12px 0', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', width: '40%' }}>Pass For</th>
             <th style={{ textAlign: 'center', padding: '12px 0', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', width: '15%' }}>Qty</th>
             <th style={{ textAlign: 'right', padding: '12px 0', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', width: '15%' }}>Price</th>
             <th style={{ textAlign: 'right', padding: '12px 0', fontSize: '12px', color: '#6b7280', textTransform: 'uppercase', width: '20%' }}>Amount</th>
@@ -183,7 +183,7 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, u
       </div>
       <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '4px', marginBottom: '24px' }}>
         {Boolean(setting("general.ticket_description", "")) && (
-          <p style={{ margin: 0, fontSize: '12px', color: '#4b5563', marginBottom: '8px', lineHeight: '1.5' }}>
+          <p style={{ margin: 0, fontSize: '12px', color: '#4b5563', marginBottom: '8px', lineHeight: '1.5', fontWeight: 'bold' }}>
             {setting("general.ticket_description", "")}
           </p>
         )}

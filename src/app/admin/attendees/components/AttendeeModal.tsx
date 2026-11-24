@@ -300,12 +300,12 @@ const AttendeeModal: React.FC<AttendeeModalProps> = ({ show, onHide, id, onSucce
               <Row>
                 <Col md={6}>
                   <Form.Group className="mb-4">
-                    <Form.Label className="text-muted">Ticket Status</Form.Label>
+                    <Form.Label className="text-muted">Pass Status</Form.Label>
                     <Select
                       options={ticketStatusOptions}
                       value={ticketStatusOptions.find(opt => opt.value === formData.ticketStatus) || null}
                       onChange={(selected: any) => setFormData({ ...formData, ticketStatus: selected?.value || null })}
-                      placeholder="Select Ticket Status"
+                      placeholder="Select Pass Status"
                       isClearable
                       styles={{
                         control: (base) => ({

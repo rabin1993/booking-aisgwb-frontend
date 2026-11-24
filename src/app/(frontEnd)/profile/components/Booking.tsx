@@ -349,8 +349,8 @@ const Booking = () => {
                   <tr>
                     <th className="fw-semibold border-0 rounded-start">No.</th>
                     <th className="fw-semibold border-0">Name</th>
-                    <th className="fw-semibold border-0">Ticket</th>
-                    <th className="fw-semibold border-0 text-center">Ticket Status</th>
+                    <th className="fw-semibold border-0">Pass For</th>
+                    <th className="fw-semibold border-0 text-center">Pass Status</th>
                     <th className="fw-semibold border-0 text-center rounded-end">Actions</th>
                   </tr>
                 </thead>

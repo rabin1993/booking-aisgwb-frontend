@@ -68,7 +68,7 @@ const ScannerContent = () => {
       
       Swal.fire({
         title: "Success",
-        text: "Ticket marked as Used!",
+        text: "Pass marked as Used!",
         icon: "success",
         confirmButtonText: "OK",
         confirmButtonColor: "#6259ca"
@@ -76,7 +76,7 @@ const ScannerContent = () => {
     } catch (err: any) {
       Swal.fire({
         title: "Attention!",
-        text: err || "Failed to update ticket status",
+        text: err || "Failed to update pass status",
         icon: "warning",
         confirmButtonColor: "#d33"
       });
@@ -89,7 +89,7 @@ const ScannerContent = () => {
     return (
       <div className="d-flex justify-content-center align-items-center">
         <Spinner animation="border" variant="primary" />
-        <span className="ms-3">Loading ticket details...</span>
+        <span className="ms-3">Loading pass details...</span>
       </div>
     );
   }
@@ -101,7 +101,7 @@ const ScannerContent = () => {
         <h4 className="text-danger mb-3">Attention!</h4>
         <p className="text-muted mb-4">
           {error.toLowerCase().includes("not found")
-            ? "Invalid QR Code. This ticket may have been deleted or does not exist in the database."
+            ? "Invalid QR Code. This pass may have been deleted or does not exist in the database."
             : error}
         </p>
         <div className="d-flex justify-content-center gap-2">
@@ -130,7 +130,7 @@ const ScannerContent = () => {
   const rawTicketName = (
     attendee.ticketName || 
     (typeof attendee.ticketId === 'object' ? attendee.ticketId?.ticketName : attendee.ticketId) || 
-    'Event Ticket'
+    'Event Pass'
   ).toString();
   const cleanBaseName = rawTicketName.replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
 
@@ -181,11 +181,11 @@ const ScannerContent = () => {
         </div>
         
         <h3 className="fw-bold mb-2">{attendee.name}</h3>
-        <p className="text-muted mb-4">Ticket Verification</p>
+        <p className="text-muted mb-4">Pass Verification</p>
 
         <div className="bg-light rounded p-4 mb-4 text-start">
           <Row className="mb-3">
-            <Col xs={5} className="text-muted fw-bold small text-uppercase">Ticket Status</Col>
+            <Col xs={5} className="text-muted fw-bold small text-uppercase">Pass Status</Col>
             <Col xs={7}>
               {isUsed && <span className="badge bg-success">Used</span>}
               {isCancelled && <span className="badge bg-danger">Cancelled</span>}
@@ -201,7 +201,7 @@ const ScannerContent = () => {
             </Col>
           </Row>
           <Row className="mb-3">
-            <Col xs={5} className="text-muted fw-bold small text-uppercase">Ticket Type</Col>
+            <Col xs={5} className="text-muted fw-bold small text-uppercase">Pass For</Col>
             <Col xs={7} className="fw-medium">
               {displayTicketType}
             </Col>
@@ -214,7 +214,7 @@ const ScannerContent = () => {
 
         {isCancelled ? (
           <Alert variant="danger">
-            This ticket has been cancelled. Do not allow entry.
+            This pass has been cancelled. Do not allow entry.
           </Alert>
         ) : !isPaymentValid ? (
           <Alert variant="warning">
@@ -223,7 +223,7 @@ const ScannerContent = () => {
         ) : isUsed ? (
           <Alert variant="success" className="mb-0">
             <Icon icon="mdi:check-circle" className="me-2" />
-            This ticket has already been used!
+            This pass has already been used!
           </Alert>
         ) : (
           <Button 
@@ -236,7 +236,7 @@ const ScannerContent = () => {
             {updating ? (
               <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2"/> Updating...</>
             ) : (
-              "Mark Ticket as Used"
+              "Mark Pass as Used"
             )}
           </Button>
         )}

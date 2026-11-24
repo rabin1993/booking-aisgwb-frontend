@@ -536,7 +536,7 @@ const BookingWizard = () => {
                   Swal.fire({
                       icon: 'warning',
                       title: 'Attention!',
-                      text: 'You have already booked a Primary pass for this event. You can only buy an Accompanying Person ticket.',
+                      text: 'You have already booked a Primary pass for this event. You can only buy an Accompanying Person Pass.',
                   });
                   return;
               }
@@ -582,7 +582,7 @@ const BookingWizard = () => {
     
     const totalSelected = Object.values(ticketSelections).reduce((a, b) => a + b, 0);
     if (totalSelected === 0) {
-      Swal.fire("Error", "Please select at least one ticket", "error");
+      Swal.fire("Error", "Please select at least one pass", "error");
       return;
     }
     

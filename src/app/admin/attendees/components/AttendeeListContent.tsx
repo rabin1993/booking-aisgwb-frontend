@@ -62,8 +62,8 @@ const AttendeeListContent: React.FC = () => {
   const agedAboveLimit = parseInt(setting('general.aged_above', '70')) || 70;
 
   const getDisplayTicketName = (att: any) => {
-    if (!att) return 'Event Ticket';
-    const rawTicketName = att.ticketName || att.ticketId?.ticketName || 'Event Ticket';
+    if (!att) return 'Event Pass';
+    const rawTicketName = att.ticketName || att.ticketId?.ticketName || 'Event Pass';
     const cleanBase = rawTicketName.replace(/\s*\((Under|Aged)[^)]*\)/gi, '').trim();
 
     let ageNum = parseInt(att.age);
@@ -97,8 +97,8 @@ const AttendeeListContent: React.FC = () => {
 
     const effectiveAge = att.age || (!isNaN(ageNum) ? String(ageNum) : '');
     return shouldShowAge && effectiveAge
-      ? `${cleanBase || 'Event Ticket'} (Aged ${effectiveAge})`
-      : (cleanBase || 'Event Ticket');
+      ? `${cleanBase || 'Event Pass'} (Aged ${effectiveAge})`
+      : (cleanBase || 'Event Pass');
   };
 
   // Filtering state
@@ -226,7 +226,7 @@ const AttendeeListContent: React.FC = () => {
     
     try {
       await dispatch(updateAttendee({ id: attendee._id || attendee.id || "", payload })).unwrap();
-      toast.success(`Ticket marked as ${newStatus}`, { duration: 3000 });
+      toast.success(`Pass marked as ${newStatus}`, { duration: 3000 });
     } catch (err: any) {
       toast.error(err || "Failed to update status");
     }
@@ -250,7 +250,7 @@ const AttendeeListContent: React.FC = () => {
     setResendingTicketId(attendeeId);
 
     // Show immediate prominent feedback
-    toast.loading(`Sending ticket to ${recipientName}...`, { id: "resendTicket" });
+    toast.loading(`Sending pass to ${recipientName}...`, { id: "resendTicket" });
     // Swal.fire({
     //   title: "Sending Ticket...",
     //   html: `Generating ticket and sending email${recipientEmail ? ` to <b>${recipientEmail}</b>` : ""}...<br/><small class="text-muted">Please wait a moment</small>`,
@@ -323,7 +323,7 @@ const AttendeeListContent: React.FC = () => {
               }
               if (freeAttendees.length > 0) {
                 items.push({
-                  name: t.ticketName || "Event Ticket",
+                  name: t.ticketName || "Event Pass",
                   quantity: freeAttendees.length,
                   unitPrice: `₹ 0.00`,
                   totalPrice: `₹ 0.00`
@@ -331,7 +331,7 @@ const AttendeeListContent: React.FC = () => {
               }
               if (items.length === 0) {
                 items.push({
-                  name: t.ticketName || "Event Ticket",
+                  name: t.ticketName || "Event Pass",
                   quantity: t.quantity || 1,
                   unitPrice: `₹ ${Number(t.price || 0).toFixed(2)}`,
                   totalPrice: `₹ ${Number((t.price || 0) * (t.quantity || 1)).toFixed(2)}`
@@ -400,7 +400,7 @@ const AttendeeListContent: React.FC = () => {
             tPdf.addImage(tImgData, "PNG", 0, 0, tPdfWidth, tPdfHeight);
             ticketPdfBase64 = tPdf.output("datauristring");
           } catch (canvasErr) {
-            console.warn("Could not capture ticket canvas:", canvasErr);
+            console.warn("Could not capture pass canvas:", canvasErr);
           }
         }
 
@@ -426,12 +426,12 @@ const AttendeeListContent: React.FC = () => {
           invoicePdfBase64: invoicePdfBase64 || undefined
         })).unwrap();
 
-        const successMessage = result.message || "Ticket email sent successfully";
+        const successMessage = result.message || "Pass email sent successfully";
         toast.success(successMessage, { id: "resendTicket" })
       } catch (err: any) {
         console.error("PDF generation/email error", err);
 
-        toast.error(err.message || err || "Failed to resend ticket email", { id: "resendTicket" });
+        toast.error(err.message || err || "Failed to resend pass email", { id: "resendTicket" });
       } finally {
         setResendingAttendee(null);
         setResendingEventDetails(null);
@@ -471,7 +471,7 @@ const AttendeeListContent: React.FC = () => {
       }),
       columnHelper.accessor("_id", {
         id: "ticketId",
-        header: "Ticket ID",
+        header: "Pass ID",
         cell: (info) => {
           const id = info.getValue() || info.row.original.id;
           return (
@@ -566,7 +566,7 @@ const AttendeeListContent: React.FC = () => {
         },
       }),
       columnHelper.accessor("ticketStatus", {
-        header: "Ticket Status",
+        header: "Pass Status",
         cell: (info) => {
           const status = info.getValue();
           let dotColor = "secondary";
@@ -662,11 +662,11 @@ const AttendeeListContent: React.FC = () => {
                   {resendingTicketId === (info.row.original._id || info.row.original.id) ? (
                     <>
                       <span className="spinner-border spinner-border-sm text-primary" role="status" aria-hidden="true"></span>
-                      <span>Sending Ticket...</span>
+                      <span>Sending Pass...</span>
                     </>
                   ) : (
                     <>
-                      <Icon icon="ticket" className="fs-14 text-muted" /> Resend Ticket
+                      <Icon icon="ticket" className="fs-14 text-muted" /> Resend Pass
                     </>
                   )}
                 </Dropdown.Item>
@@ -719,7 +719,7 @@ const AttendeeListContent: React.FC = () => {
 
   const exportToCSV = () => {
     if (attendees.length === 0) return;
-    const headers = ["ID", "Name", "Event", "Ticket", "Price", "Ticket Status", "Payment Status", "Date"];
+    const headers = ["ID", "Name", "Event", "Pass For", "Price", "Pass Status", "Payment Status", "Date"];
     const csvContent = [
       headers.join(","),
       ...attendees.map((a) => {

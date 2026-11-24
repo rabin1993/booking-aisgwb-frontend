@@ -353,7 +353,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({ show, onHide,
               <tr>
                 <th className="fw-semibold py-2">No.</th>
                 <th className="fw-semibold py-2">Name</th>
-                <th className="fw-semibold py-2">Ticket</th>
+                <th className="fw-semibold py-2">Pass For</th>
                 <th className="fw-semibold py-2 text-center">Status</th>
                 <th className="fw-semibold py-2 text-end pe-4">Actions</th>
               </tr>
@@ -393,7 +393,7 @@ const BookingDetailsModal: React.FC<BookingDetailsModalProps> = ({ show, onHide,
                     <tr key={attendeeNo}>
                       <td className="py-2 text-muted">{attendeeNo}</td>
                       <td className="py-2 text-muted">{attendee.name || '-'}</td>
-                      <td className="py-2 text-muted">{t.ticketName || 'Ticket'}</td>
+                      <td className="py-2 text-muted">{t.ticketName || 'Pass For'}</td>
                       <td className="py-2 text-center">
                         <Badge
                           bg={
