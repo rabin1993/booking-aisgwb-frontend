@@ -1,5 +1,5 @@
 "use client";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import { FormControl, FormLabel } from "react-bootstrap";
 
 type OTPInputProps = {
@@ -19,6 +19,12 @@ const OTPInput = ({
 }: OTPInputProps) => {
   const inputsRef = useRef<Array<HTMLInputElement | null>>([]);
 
+  useEffect(() => {
+    if (code.every((c) => !c)) {
+      inputsRef.current[0]?.focus();
+    }
+  }, [code]);
+
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>,
     idx: number,
@@ -34,6 +40,7 @@ const OTPInput = ({
       inputsRef.current[idx + 1]?.focus();
     }
   };
+
   const handleKeyDown = (
     e: React.KeyboardEvent<HTMLInputElement>,
     idx: number,
@@ -42,6 +49,21 @@ const OTPInput = ({
       inputsRef.current[idx - 1]?.focus();
     }
   };
+
+  const handlePaste = (e: React.ClipboardEvent<HTMLInputElement>) => {
+    e.preventDefault();
+    const pastedData = e.clipboardData.getData("text").trim();
+    if (!/^\d+$/.test(pastedData)) return;
+    const digits = pastedData.slice(0, code.length).split("");
+    const newCode = [...code];
+    digits.forEach((digit, i) => {
+      newCode[i] = digit;
+    });
+    setCode(newCode);
+    const nextIndex = Math.min(digits.length, code.length - 1);
+    inputsRef.current[nextIndex]?.focus();
+  };
+
   return (
     <>
       <FormLabel className={labelClassName}>
@@ -63,6 +85,7 @@ const OTPInput = ({
             onKeyDown={(e) =>
               handleKeyDown(e as React.KeyboardEvent<HTMLInputElement>, idx)
             }
+            onPaste={handlePaste}
             ref={(el: HTMLInputElement | null) => {
               inputsRef.current[idx] = el;
             }}

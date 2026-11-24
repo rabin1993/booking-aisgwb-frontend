@@ -91,6 +91,7 @@ const Forms = () => {
 
       const res = await dispatch(frontendSendOtp(payload)).unwrap();
 
+      setOtpCode(Array(6).fill(""));
       setStep(2);
       const successMsg =
         res?.data?.message ||
@@ -110,6 +111,36 @@ const Forms = () => {
       } else {
         setError("Failed to send OTP. Please try again.");
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleResendOtp = async () => {
+    setOtpCode(Array(6).fill(""));
+    setError(null);
+    try {
+      setLoading(true);
+      const cleanMobile = cleanMobileNumber(mobileNo);
+      const payload = {
+        name: fullName.trim(),
+        groupId: "GRP-3",
+        sex,
+        email: email.trim(),
+        mobile: cleanMobile,
+        username: email.trim(),
+        password: "TempPassword123!",
+      };
+      const res = await dispatch(frontendSendOtp(payload)).unwrap();
+      const successMsg =
+        res?.data?.message ||
+        res?.message ||
+        `Verification code sent to ${email.trim()} and +91 ${cleanMobile}`;
+      toast.success(successMsg);
+    } catch (err: any) {
+      const msg = typeof err === "string" ? err : err?.message || "Failed to resend OTP. Please try again.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -326,12 +357,24 @@ const Forms = () => {
             />
 
             <div className="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
-              <span className="text-muted fs-12">Code expires in 2:00</span>
+              <Button
+                variant="link"
+                size="sm"
+                className="p-0 text-decoration-underline fs-12"
+                onClick={handleResendOtp}
+                type="button"
+                disabled={loading}
+              >
+                Resend OTP
+              </Button>
               <Button
                 variant="link"
                 size="sm"
                 className="p-0 text-muted fs-12"
-                onClick={() => setStep(1)}
+                onClick={() => {
+                  setOtpCode(Array(6).fill(""));
+                  setStep(1);
+                }}
                 type="button"
               >
                 Edit Details

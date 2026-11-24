@@ -52,10 +52,12 @@ const LoginForm = () => {
       return;
     }
     setLocalError(null);    
+    setOtpCode(Array(6).fill(""));
     setLoading(true);
     try {
       const res = await dispatch(frontendLoginSendOtp({ identifier: identifier.trim() })).unwrap();
 
+      setOtpCode(Array(6).fill(""));
       setOtpSent(true);
       setCountdown(60);
       const successMsg = res?.message || res?.data?.message || `Verification code sent to ${identifier.trim()}`;
@@ -229,8 +231,12 @@ const LoginForm = () => {
                     variant="link"
                     size="sm"
                     className="p-0 text-decoration-underline fs-12"
-                    onClick={handleSendOtp}
+                    onClick={() => {
+                      setOtpCode(Array(6).fill(""));
+                      handleSendOtp();
+                    }}
                     type="button"
+                    disabled={loading}
                   >
                     Resend OTP
                   </Button>
@@ -240,7 +246,12 @@ const LoginForm = () => {
                 variant="link"
                 size="sm"
                 className="p-0 text-muted fs-12"
-                onClick={() => setOtpSent(false)}
+                onClick={() => {
+                  setOtpCode(Array(6).fill(""));
+                  setOtpSent(false);
+                  setCountdown(0);
+                  setLocalError(null);
+                }}
                 type="button"
               >
                 Edit Email/Mobile
