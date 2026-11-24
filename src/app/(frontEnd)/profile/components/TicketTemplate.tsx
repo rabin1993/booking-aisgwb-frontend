@@ -98,7 +98,7 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
     } else if (!isAccompanying) {
       reasonWaiverValue = `${agedAboveLimit} & Above`;
     } else {
-      reasonWaiverValue = `${underAgeLimit} & Below`;
+      reasonWaiverValue = `${underAgeLimit} OR Below`;
     }
   }
 
@@ -166,17 +166,24 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
                 <span className="detail-value">{reasonWaiverValue}</span>
               </div>
             )}
-            
-            <div className="detail-item">
-              <span className="detail-label">STATUS :</span>
-              <span className="detail-value">{attendee.ticketStatus || 'Unused'}</span>
-            </div>
-            {attendee?.relation && (
+            {attendee?.relation && isAccompanying && (
               <div className="detail-item">
                 <span className="detail-label">RELATION :</span>
                 <span className="detail-value">{attendee.relation}</span>
               </div>
             )}
+
+            {!isAccompanying && (
+              <div className="detail-item">
+                <span className="detail-label">RELATION :</span>
+                <span className="detail-value">Self</span>
+              </div>
+            )}            
+            <div className="detail-item">
+              <span className="detail-label">STATUS :</span>
+              <span className="detail-value">{attendee.ticketStatus || 'Unused'}</span>
+            </div>
+
           </div>
         </div>
         <div className="rights">
@@ -195,9 +202,9 @@ export const TicketTemplate = forwardRef<HTMLDivElement, TicketTemplateProps>(({
         </div>
       </div>
 
-      <div className="notice-section">
+      {/* <div className="notice-section">
         <p className="notice-gap">{setting('general.ticket_description', '')}</p>
-      </div>
+      </div> */}
       <div className="footer-info">
         {setting('seo.meta_description', '')}<br />
         {setting('general.website_address', '')}<br />

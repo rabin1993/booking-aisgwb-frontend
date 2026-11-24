@@ -207,7 +207,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                                 />
                                             </div>
                                             <div className="col-md-4">
-                                                <label className="form-label fw-semibold d-block">Age (Above {underAgeLimit} | {underAgeLimit} & Below)</label>
+                                                <label className="form-label fw-semibold d-block">Age (Above {underAgeLimit} | {underAgeLimit} OR Below)</label>
                                                 <div className="d-flex align-items-center gap-3 pt-2">
                                                     <div className="form-check">
                                                         <input
@@ -234,7 +234,7 @@ const AttendeeList: React.FC<AttendeeListProps> = ({
                                                             onChange={() => onChangeAttendee(attendee.id, 'is_waiver', 'yes')}
                                                         />
                                                         <label className="form-check-label fw-medium cursor-pointer" htmlFor={`age-yes-${attendee.id}`}>
-                                                            {underAgeLimit} & Below
+                                                            {underAgeLimit} OR Below
                                                         </label>
                                                     </div>
                                                 </div>

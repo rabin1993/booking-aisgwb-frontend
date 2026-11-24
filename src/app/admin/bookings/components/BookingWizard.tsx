@@ -104,7 +104,7 @@ const BookingWizard = () => {
     const finalName = shouldShowAge && att?.age 
       ? `${cleanBase} (Aged ${att.age})` 
       : shouldShowAge 
-        ? `${cleanBase} (${isAcc ? `${underAgeLimit} & Below` : `${agedAboveLimit} & Above`})`
+        ? `${cleanBase} (${isAcc ? `${underAgeLimit} OR Below` : `${agedAboveLimit} & Above`})`
         : cleanBase;
 
     return {
@@ -704,7 +704,7 @@ const BookingWizard = () => {
       if (field === 'is_waiver') {
         const isYes = value === 'yes';
         const defaultReason = isYes 
-          ? (!isAcc ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`)
+          ? (!isAcc ? `${agedAboveLimit} & Above` : `${underAgeLimit} OR Below`)
           : '';
         currentItem.is_waiver = value;
         currentItem.reason_waiver = isYes ? (currentItem.reason_waiver || defaultReason) : '';
@@ -723,7 +723,7 @@ const BookingWizard = () => {
           } else {
             if (ageNum <= underAgeLimit && ageNum > 0) {
               currentItem.is_waiver = 'yes';
-              currentItem.reason_waiver = currentItem.reason_waiver || `${underAgeLimit} & Below`;
+              currentItem.reason_waiver = currentItem.reason_waiver || `${underAgeLimit} OR Below`;
             } else {
               currentItem.is_waiver = 'no';
               currentItem.reason_waiver = '';
@@ -840,7 +840,7 @@ const BookingWizard = () => {
             name: attendee.name,
             age: attendee.age || (info.ageNum ? String(info.ageNum) : ""),
             relation: attendee.relation || "",
-            reason_waiver: attendee.reason_waiver || (attendee.is_waiver === 'yes' ? (!info.isAcc ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`) : "")
+            reason_waiver: attendee.reason_waiver || (attendee.is_waiver === 'yes' ? (!info.isAcc ? `${agedAboveLimit} & Above` : `${underAgeLimit} OR Below`) : "")
           });
         }
 
@@ -1351,7 +1351,7 @@ const BookingWizard = () => {
                                   />
                                 </Col>
                                 <Col md={4} className="mb-3">
-                                  <Form.Label className="small text-dark d-block">Age (Above  {underAgeLimit} | {underAgeLimit} & Below)</Form.Label>
+                                  <Form.Label className="small text-dark d-block">Age (Above  {underAgeLimit} | {underAgeLimit} OR Below)</Form.Label>
                                   <div className="d-flex align-items-center gap-3 pt-2">
                                     <Form.Check 
                                       type="radio"
@@ -1365,7 +1365,7 @@ const BookingWizard = () => {
                                       type="radio"
                                       id={`age-yes-${ticketId}-${idx}`}
                                       name={`age-waiver-${ticketId}-${idx}`}
-                                      label={`${underAgeLimit} & Below`}
+                                      label={`${underAgeLimit} OR Below`}
                                       checked={attendees[ticketId]?.[idx]?.is_waiver === 'yes'}
                                       onChange={() => handleAttendeeChange(ticketId, idx, 'is_waiver', 'yes')}
                                     />

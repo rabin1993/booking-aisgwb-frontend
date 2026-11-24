@@ -208,7 +208,7 @@ const CheckoutClient = () => {
             if (field === 'is_waiver') {
                 const isYes = value === 'yes';
                 const defaultReason = isYes 
-                    ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`)
+                    ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} OR Below`)
                     : '';
                 return {
                     ...a,
@@ -232,7 +232,7 @@ const CheckoutClient = () => {
                     } else {
                         if (ageNum <= underAgeLimit && ageNum > 0) {
                             isWaiver = 'yes';
-                            reasonWaiver = reasonWaiver || `${underAgeLimit} & Below`;
+                            reasonWaiver = reasonWaiver || `${underAgeLimit} OR Below`;
                         } else {
                             isWaiver = 'no';
                             reasonWaiver = '';
@@ -286,7 +286,7 @@ const CheckoutClient = () => {
         const finalName = shouldShowAge && a.age 
             ? `${cleanBase} ( ${a.age} & Above)` 
             : shouldShowAge 
-                ? `${cleanBase} (${a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`})` 
+                ? `${cleanBase} (${a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} OR Below`})` 
                 : cleanBase;
         return { ticket, ageNum, isUnderAge, isAboveAge, shouldShowAge, isWaiver, finalPrice, finalName, cleanBase };
     }, [tickets, underAgeLimit, agedAboveLimit]);
@@ -384,7 +384,7 @@ const CheckoutClient = () => {
                                 name: a.name, 
                                 age: a.age || '', 
                                 relation: a.relation || '', 
-                                reason_waiver: a.reason_waiver || (a.is_waiver === 'yes' ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`) : '')
+                                reason_waiver: a.reason_waiver || (a.is_waiver === 'yes' ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} OR Below`) : '')
                             }))
                         })),
                         totalAmount,
@@ -398,7 +398,7 @@ const CheckoutClient = () => {
                             name: a.name,
                             age: a.age || '',
                             relation: a.relation || '',
-                            reason_waiver: a.reason_waiver || (a.is_waiver === 'yes' ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} & Below`) : ''),
+                            reason_waiver: a.reason_waiver || (a.is_waiver === 'yes' ? (a.isPrimary !== false ? `${agedAboveLimit} & Above` : `${underAgeLimit} OR Below`) : ''),
                             ticketName: info.finalName,
                             ticketId: info.ticket?._id || info.ticket?.id,
                             ticketPrice: info.finalPrice,

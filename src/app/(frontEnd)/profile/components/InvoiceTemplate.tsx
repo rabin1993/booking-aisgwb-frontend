@@ -181,9 +181,12 @@ export const InvoiceTemplate: React.FC<InvoiceTemplateProps> = ({ transaction, u
           </div>
         </div>
       </div>
+      <div style={{ padding: '16px', borderRadius: '4px', marginBottom: '24px' }}>
+        <p>{setting("general.ticket_description", "")}</p>
+      </div>
 
       <div style={{ backgroundColor: '#f8fafc', padding: '16px', borderRadius: '4px', marginBottom: '24px' }}>
-        <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Note: For Any Assistance Or Queries, please contact {setting("general.support_email", "")}.</p>
+        <p style={{ margin: 0, fontSize: '12px', color: '#6b7280' }}>Note: For Any Assistance Or Queries, Please Contact {setting("general.support_email", "")}.</p>
       </div>
       <div style={{ textAlign: 'right' }}>
         <p style={{ margin: 0, fontSize: '14px', color: '#1f2937', fontWeight: 'bold', marginBottom: '4px' }}>Thank you for being a part of this Conference!</p>
