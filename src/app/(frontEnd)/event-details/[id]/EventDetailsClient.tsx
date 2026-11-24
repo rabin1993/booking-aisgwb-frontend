@@ -24,12 +24,28 @@ const DEFAULT_EVENT_BANNER = "https://aisgwb.org/wp-content/uploads/2026/11/30th
 const EventDetailsClient = ({ eventId }: { eventId: string }) => {
     const dispatch = useDispatch<AppDispatch>();
     const { currentEvent: event, loading, error, tickets, ticketsLoading } = useSelector((state: RootState) => state.frontendEvents);
-    const { user, isAuthenticated } = useSelector((state: RootState) => state.auth);
+    const { user: authUser, isAuthenticated } = useSelector((state: RootState) => state.auth);
+    const { user: frontendUser } = useSelector((state: RootState) => state.frontendUser);
+    const user = frontendUser || authUser;
+    const isUserLoggedIn = Boolean(isAuthenticated || user);
     const { myMembership } = useSelector((state: RootState) => state.frontendMembership);
     const { bookings } = useSelector((state: RootState) => state.frontendBooking);
     const [quantities, setQuantities] = useState<Record<string, number>>({});
     const [bannerImg, setBannerImg] = useState<string>("");
-    const router = useRouter();    
+    const router = useRouter();
+
+    // Reset selected quantities if user logs out without completing payment
+    const prevAuthRef = React.useRef<boolean>(isUserLoggedIn);
+    React.useEffect(() => {
+        if (prevAuthRef.current && !isUserLoggedIn) {
+            setQuantities({});
+            if (typeof window !== "undefined") {
+                sessionStorage.removeItem("checkoutData");
+                localStorage.removeItem("checkoutData");
+            }
+        }
+        prevAuthRef.current = isUserLoggedIn;
+    }, [isUserLoggedIn]);
 
     React.useEffect(() => {
         if (event) {
@@ -48,7 +64,13 @@ const EventDetailsClient = ({ eventId }: { eventId: string }) => {
             if (stored) {
                 try {
                     const data = JSON.parse(stored);
-                    if (data.event?.id === eventId || data.event?._id === eventId) {
+                    const currentUserId = user?._id || user?.id;
+                    if (data.userId && currentUserId && data.userId !== currentUserId) {
+                        sessionStorage.removeItem("checkoutData");
+                    } else if (data.userId && !currentUserId) {
+                        // User who created this checkout data is logged out
+                        sessionStorage.removeItem("checkoutData");
+                    } else if (data.event?.id === eventId || data.event?._id === eventId) {
                         const initialQuantities: Record<string, number> = {};
                         if (data.tickets && Array.isArray(data.tickets)) {
                             data.tickets.forEach((t: any) => {
@@ -63,7 +85,7 @@ const EventDetailsClient = ({ eventId }: { eventId: string }) => {
                 }
             }
         }
-    }, [dispatch, eventId]);
+    }, [dispatch, eventId, user?._id, user?.id]);
 
     // Fetch live membership status from the API whenever the user is known
     React.useEffect(() => {
@@ -540,7 +562,7 @@ const EventDetailsClient = ({ eventId }: { eventId: string }) => {
                                                     <span>Total: {formatCurrency(totalPrice)}</span>
                                                 </div>
 
-                                        {isAuthenticated ? (
+                                        {isUserLoggedIn ? (
                                         <button
                                             type="button"
                                             className="btn w-100 py-2 fw-bold text-uppercase"
@@ -625,6 +647,7 @@ const EventDetailsClient = ({ eventId }: { eventId: string }) => {
                                                         startTime: event?.startTime || "",
                                                         venue: event?.venueLocation || "",
                                                     },
+                                                    userId: user?._id || user?.id || null,
                                                     totalQuantity,
                                                     totalPrice,
                                                     tickets: selectedTickets.map(t => ({

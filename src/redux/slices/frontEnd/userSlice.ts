@@ -430,6 +430,8 @@ const userSlice = createSlice({
         localStorage.removeItem("frontend_user");
         sessionStorage.removeItem("frontend_token");
         sessionStorage.removeItem("frontend_user");
+        sessionStorage.removeItem("checkoutData");
+        localStorage.removeItem("checkoutData");
         document.cookie = "user=; path=/; max-age=0; SameSite=Lax";
         // Do not delete "token" cookie entirely if we want admin to remain logged in, but for safety, frontend logout clears it:
         document.cookie = "token=; path=/; max-age=0; SameSite=Lax";

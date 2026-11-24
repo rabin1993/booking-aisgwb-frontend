@@ -382,6 +382,8 @@ const authSlice = createSlice({
           localStorage.removeItem("token");
           sessionStorage.removeItem("user");
           localStorage.removeItem("user");
+          sessionStorage.removeItem("checkoutData");
+          localStorage.removeItem("checkoutData");
           document.cookie = "token=; path=/; max-age=0; SameSite=Lax";
           document.cookie = "user=; path=/; max-age=0; SameSite=Lax";
         }
@@ -396,6 +398,8 @@ const authSlice = createSlice({
           localStorage.removeItem("token");
           sessionStorage.removeItem("user");
           localStorage.removeItem("user");
+          sessionStorage.removeItem("checkoutData");
+          localStorage.removeItem("checkoutData");
           document.cookie = "token=; path=/; max-age=0; SameSite=Lax";
           document.cookie = "user=; path=/; max-age=0; SameSite=Lax";
         }

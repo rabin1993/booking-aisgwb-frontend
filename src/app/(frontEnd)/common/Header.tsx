@@ -97,6 +97,8 @@ export default function Header() {
           sessionStorage.removeItem("user");
           sessionStorage.removeItem("frontend_token");
           sessionStorage.removeItem("frontend_user");
+          sessionStorage.removeItem("checkoutData");
+          localStorage.removeItem("checkoutData");
           document.cookie = "token=; path=/; max-age=0; SameSite=Lax";
           document.cookie = "user=; path=/; max-age=0; SameSite=Lax";
           sessionStorage.setItem("show_frontend_logout_toast", "true");
