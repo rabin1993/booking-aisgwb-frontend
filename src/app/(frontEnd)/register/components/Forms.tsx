@@ -1,7 +1,7 @@
 "use client";
 import OTPInput from "@/components/OTPInput";
 import Icon from "@/components/wrappers/Icon";
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useDispatch } from "react-redux";
 import { AppDispatch } from "@/redux/store";
 import { frontendSendOtp, frontendVerifyRegistrationOtp } from "@/redux/slices/frontEnd/userSlice";
@@ -36,9 +36,26 @@ const Forms = () => {
   
   const [agreeTerms, setAgreeTerms] = useState(true);
   const [otpCode, setOtpCode] = useState<string[]>(Array(6).fill(""));
+  const [countdown, setCountdown] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    let timer: NodeJS.Timeout;
+    if (countdown > 0 && step === 2) {
+      timer = setInterval(() => {
+        setCountdown((prev) => (prev > 0 ? prev - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(timer);
+  }, [countdown, step]);
+
+  const formatCountdown = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  };
   
 
   const handleProceedToOtp = async (e: FormEvent) => {
@@ -92,6 +109,7 @@ const Forms = () => {
       const res = await dispatch(frontendSendOtp(payload)).unwrap();
 
       setOtpCode(Array(6).fill(""));
+      setCountdown(300);
       setStep(2);
       const successMsg =
         res?.data?.message ||
@@ -132,6 +150,7 @@ const Forms = () => {
         password: "TempPassword123!",
       };
       const res = await dispatch(frontendSendOtp(payload)).unwrap();
+      setCountdown(300);
       const successMsg =
         res?.data?.message ||
         res?.message ||
@@ -150,6 +169,11 @@ const Forms = () => {
     e.preventDefault();
     setError(null);
 
+    if (countdown === 0) {
+      setError("Verification code has expired. Please click Resend OTP to get a new code.");
+      return;
+    }
+
     const code = otpCode.join("");
     if (code.length < 6) {
       setError("Please enter the full 6-digit verification code.");
@@ -165,7 +189,9 @@ const Forms = () => {
       
       window.location.href = "/profile";
     } catch (err: any) {
-      setError(err.message || "Registration failed");
+      const msg = typeof err === "string" ? err : err?.message || err?.error || "Registration failed";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }
@@ -357,28 +383,48 @@ const Forms = () => {
             />
 
             <div className="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-decoration-underline fs-12"
-                onClick={handleResendOtp}
-                type="button"
-                disabled={loading}
+              <span
+                className={`fs-12 d-flex align-items-center ${
+                  countdown > 0 ? "text-muted" : "text-danger fw-semibold"
+                }`}
               >
-                Resend OTP
-              </Button>
-              <Button
-                variant="link"
-                size="sm"
-                className="p-0 text-muted fs-12"
-                onClick={() => {
-                  setOtpCode(Array(6).fill(""));
-                  setStep(1);
-                }}
-                type="button"
-              >
-                Edit Details
-              </Button>
+                <Icon icon="clock" className="me-1" />
+                {countdown > 0 ? (
+                  <>
+                    Expires in:{" "}
+                    <strong className="text-dark ms-1">
+                      {formatCountdown(countdown)}
+                    </strong>
+                  </>
+                ) : (
+                  <>OTP Expired</>
+                )}
+              </span>
+              <div className="d-flex align-items-center gap-3">
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="p-0 text-decoration-underline fs-12"
+                  onClick={handleResendOtp}
+                  type="button"
+                  disabled={loading}
+                >
+                  Resend OTP
+                </Button>
+                <Button
+                  variant="link"
+                  size="sm"
+                  className="p-0 text-muted fs-12"
+                  onClick={() => {
+                    setOtpCode(Array(6).fill(""));
+                    setCountdown(0);
+                    setStep(1);
+                  }}
+                  type="button"
+                >
+                  Edit Details
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -397,7 +443,11 @@ const Forms = () => {
             <Button
               variant="light"
               type="button"
-              onClick={() => setStep(1)}
+              onClick={() => {
+                setOtpCode(Array(6).fill(""));
+                setCountdown(0);
+                setStep(1);
+              }}
               className="fw-semibold"
             >
               Back
